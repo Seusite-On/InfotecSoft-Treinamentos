@@ -58,7 +58,8 @@ class AuthService
         if ($v['doc'] === '') $e['doc'] = 'Informe o CNPJ da empresa.';
         elseif (strlen($v['doc']) !== 14 || !valid_cnpj($v['doc'])) $e['doc'] = 'CNPJ inválido. Confira os números.';
         elseif (!($company = (new \App\Repositories\CompanyRepository())->findByCnpj($v['doc']))) $e['doc'] = 'Empresa não encontrada no portal. Confira o CNPJ ou fale com a InfotecSoft.';
-        if (!$this->systems->exists($v['sys'])) $e['sys'] = 'Selecione o sistema que sua empresa utiliza.';
+        $all = $v['sys'] === 'todos';
+        if (!$all && !$this->systems->exists($v['sys'])) $e['sys'] = 'Selecione o sistema que sua empresa utiliza.';
         if (!filter_var($v['email'], FILTER_VALIDATE_EMAIL) || mb_strlen($v['email']) > 150) $e['email'] = 'Informe um e-mail válido (ex.: nome@empresa.com.br).';
         elseif ($this->users->emailInUse($v['email'])) $e['email'] = 'Já existe uma solicitação com este e-mail.';
         if (!preg_match('/^[a-zA-Z0-9._-]{3,30}$/', $v['user'])) $e['user'] = 'Use de 3 a 30 caracteres: letras, números, ponto, hífen ou _ (sem espaços).';
@@ -70,7 +71,7 @@ class AuthService
         $id = $this->users->create([
             'name' => $v['nome'], 'company_name' => $company['name'], 'company_id' => (int) $company['company_id'], 'document' => format_doc($v['doc']), 'email' => $v['email'],
             'username' => $v['user'], 'password' => password_hash($v['pw'], PASSWORD_DEFAULT), 'role' => 'user', 'status' => 'pendente',
-            'requested_system_id' => $v['sys'], 'created_at' => now(),
+            'requested_system_id' => $all ? null : $v['sys'], 'requested_all' => $all ? 1 : 0, 'created_at' => now(),
         ]);
         return ['ok' => true, 'user' => ['id' => (string) $id, 'nome' => $v['nome'], 'empresa' => $company['name'], 'sistema' => $v['sys'], 'usuario' => $v['user']]];
     }

@@ -26,8 +26,12 @@ class UserService
             'revoked' => ($status === 'recusado' && $u['status'] === 'aprovado') ? 1 : 0,
         ]);
         // Ao aprovar pela primeira vez, libera o sistema que a pessoa informou no cadastro (todos os módulos).
-        if ($status === 'aprovado' && !$this->users->hasAnyAccess($id) && $u['requested_system_id']) {
-            $this->users->grantSystem($id, $u['requested_system_id'], $by);
+        if ($status === 'aprovado' && !$this->users->hasAnyAccess($id)) {
+            if (!empty($u['requested_all'])) {
+                foreach ((new \App\Repositories\SystemRepository())->all() as $s) $this->users->grantSystem($id, $s['system_id'], $by);
+            } elseif ($u['requested_system_id']) {
+                $this->users->grantSystem($id, $u['requested_system_id'], $by);
+            }
         }
         return ['ok' => true];
     }
@@ -72,11 +76,11 @@ class UserService
         elseif (strtolower($user) === 'admin' || \App\Core\DB::select('SELECT user_id FROM users WHERE LOWER(username) = LOWER(?) AND user_id <> ?', [$user, $id])) $e['usuario'] = 'Este usuário já está em uso.';
         $company = (new \App\Repositories\CompanyRepository())->findByCnpj($cnpj);
         if (!$company) $e['cnpj'] = 'Empresa não encontrada. Use o CNPJ de uma empresa cadastrada no portal.';
-        if ($sys !== '' && !(new \App\Repositories\SystemRepository())->exists($sys)) $e['sistema'] = 'Sistema inválido.';
+        if ($sys !== '' && $sys !== 'todos' && !(new \App\Repositories\SystemRepository())->exists($sys)) $e['sistema'] = 'Sistema inválido.';
         if ($e) return ['ok' => false, 'status' => 422, 'errors' => $e, 'message' => reset($e)];
         $this->users->update($id, [
             'name' => $nome, 'email' => $email, 'username' => $user, 'company_name' => $company['name'], 'company_id' => (int) $company['company_id'],
-            'document' => format_doc($company['cnpj']), 'requested_system_id' => $sys ?: null, 'updated_at' => now(),
+            'document' => format_doc($company['cnpj']), 'requested_system_id' => ($sys && $sys !== 'todos') ? $sys : null, 'requested_all' => $sys === 'todos' ? 1 : 0, 'updated_at' => now(),
         ]);
         return ['ok' => true];
     }

@@ -96,7 +96,7 @@ class StateService
                 }
                 return [
                     'id' => (string) $id, 'nome' => $u['name'], 'empresa' => $u['company_name'] ?? '', 'doc' => $u['document'] ?? '',
-                    'email' => $u['email'], 'sistema' => $u['requested_system_id'] ?? '', 'usuario' => $u['username'], 'status' => $u['status'],
+                    'email' => $u['email'], 'sistema' => !empty($u['requested_all']) ? 'todos' : ($u['requested_system_id'] ?? ''), 'usuario' => $u['username'], 'status' => $u['status'],
                     'revogado' => (bool) $u['revoked'], 'troca_senha' => (bool) ($u['must_change_password'] ?? 0), 'criado' => ms($u['created_at']), 'decidido' => ms($u['decided_at']),
                     'perms' => (object) ($accessAll[$id] ?? []), 'adm' => $adm,
                 ];
