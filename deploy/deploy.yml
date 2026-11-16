@@ -7,9 +7,9 @@
 #   DB_PASSWORD  senha criada no hPanel > Bancos de dados
 name: Publicar em zenim.me (Hostinger)
 
+# Automático desligado (Actions bloqueado na conta). Publicação feita pelo PC: publicar-hostinger.bat
+# Para voltar ao automático, troque o bloco abaixo por:  push: { branches: [main] }
 on:
-  push:
-    branches: [main]
   workflow_dispatch: {}
 
 concurrency:
@@ -37,7 +37,8 @@ jobs:
         run: |
           test -n "$HOST" || { echo "::error::Secret SSH_HOST não configurado"; exit 1; }
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.SSH_KEY }}" | tr -d '\r' | sed -n '/-----BEGIN/,/-----END/p' > ~/.ssh/deploy_key
+          grep -q 'BEGIN' ~/.ssh/deploy_key || { echo "::error::Secret SSH_KEY sem a chave (cole o conteúdo do arquivo CHAVE-PRIVADA-GITHUB.txt)"; exit 1; }
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           echo "SSH=ssh -i $HOME/.ssh/deploy_key -p $PORT -o BatchMode=yes $USER@$HOST" >> "$GITHUB_ENV"
