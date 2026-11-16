@@ -23,7 +23,7 @@ $Key    = Join-Path $KeyDir 'zenim_deploy'
 $KeyTxt = Join-Path $Root 'deploy\CHAVE-PRIVADA-GITHUB.txt'
 if (Test-Path $KeyTxt) {
   $txt = Get-Content $KeyTxt -Raw
-  $m = [regex]::Match($txt, '-----BEGIN[^-]+-----[\s\S]+?-----END[^-]+-----')
+  $m = [regex]::Match($txt, '-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----')
   if (-not $m.Success) { Falha 'O arquivo deploy\CHAVE-PRIVADA-GITHUB.txt nao tem a chave.' }
   New-Item -ItemType Directory -Force $KeyDir | Out-Null
   if (Test-Path $Key) { icacls $Key /reset | Out-Null }

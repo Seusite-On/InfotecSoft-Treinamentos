@@ -37,7 +37,7 @@ jobs:
         run: |
           test -n "$HOST" || { echo "::error::Secret SSH_HOST não configurado"; exit 1; }
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.SSH_KEY }}" | tr -d '\r' | sed -n '/-----BEGIN/,/-----END/p' > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.SSH_KEY }}" | tr -d '\r' | sed -n '/-----BEGIN [A-Z ]*PRIVATE KEY-----/,/-----END [A-Z ]*PRIVATE KEY-----/p' > ~/.ssh/deploy_key
           grep -q 'BEGIN' ~/.ssh/deploy_key || { echo "::error::Secret SSH_KEY sem a chave (cole o conteúdo do arquivo CHAVE-PRIVADA-GITHUB.txt)"; exit 1; }
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
