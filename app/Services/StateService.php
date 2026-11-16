@@ -24,6 +24,9 @@ class StateService
     {
         $systems = array_map(fn($s) => ['id' => $s['system_id'], 'name' => $s['name'], 'desc' => $s['description']], $this->systems->all());
         $state = ['ok' => true, 'csrf' => CSRF::token(), 'me' => null, 'systems' => $systems];
+        // Números reais para a tela de login (sem dados pessoais).
+        $st = \App\Core\DB::select("SELECT (SELECT COUNT(*) FROM lessons WHERE video_source <> 'none') AS v, (SELECT COUNT(*) FROM modules) AS m")[0] ?? [];
+        $state['stats'] = ['videos' => (int) ($st['v'] ?? 0), 'modules' => (int) ($st['m'] ?? 0), 'systems' => count($systems)];
 
         $sess = Auth::user();
         $me = $sess ? $this->users->find((int) $sess['user_id']) : null;

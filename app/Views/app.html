@@ -1549,9 +1549,9 @@ html[data-theme="dark"] .pl-h h3{color:var(--ink)!important}
       <p>Videoaulas objetivas, passo a passo, para você e sua equipe usarem o Fusion, E-Trade e Avante com segurança no dia a dia.</p>
     </div>
     <div class="l-stats">
-      <div><b>480+</b><small>videoaulas</small></div>
-      <div><b>5</b><small>sistemas</small></div>
-      <div><b>12 mil</b><small>alunos ativos</small></div>
+      <div><b id="ls-v">–</b><small>videoaulas</small></div>
+      <div><b id="ls-s">5</b><small>sistemas</small></div>
+      <div><b id="ls-m">–</b><small>módulos</small></div>
     </div>
   </div>
   <div class="l-form">
@@ -1807,15 +1807,15 @@ const PLAY = `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M7 4v16l1
 
 const SYS = [
  {id:'fusion-web', name:'Fusion Web', icon:'globe', grad:'linear-gradient(135deg,#0E3A7E,#1A5FD0)', c:'#1A5FD0', tag:'MAIS USADO',
-  desc:'ERP completo na nuvem para gestão comercial, fiscal e financeira, acessível de qualquer navegador.', users:'5,2 mil', prog:38},
+  desc:'ERP completo na nuvem para gestão comercial, fiscal e financeira, acessível de qualquer navegador.'},
  {id:'fusion-web-2', name:'Fusion Web 2.0', icon:'cloud', grad:'linear-gradient(135deg,#0B4F8A,#0EA5E9)', c:'#0E8BD0', tag:'NOVO',
-  desc:'A nova geração do Fusion Web: interface renovada, painéis inteligentes e operações mais rápidas.', users:'2,1 mil', prog:12},
+  desc:'A nova geração do Fusion Web: interface renovada, painéis inteligentes e operações mais rápidas.'},
  {id:'fusion-desktop', name:'Fusion Desktop', icon:'monitor', grad:'linear-gradient(135deg,#1E2A6E,#3B5BDB)', c:'#3B5BDB', tag:'',
-  desc:'Versão instalada para Windows, ideal para operações locais com alto volume e PDV integrado.', users:'3,4 mil', prog:64},
+  desc:'Versão instalada para Windows, ideal para operações locais com alto volume e PDV integrado.'},
  {id:'e-trade', name:'E-Trade', icon:'store', grad:'linear-gradient(135deg,#0A3D5C,#0891B2)', c:'#0891B2', tag:'',
-  desc:'Gestão de vendas e frente de loja com integração a marketplaces e controle de pedidos.', users:'1,6 mil', prog:0},
+  desc:'Gestão de vendas e frente de loja com integração a marketplaces e controle de pedidos.'},
  {id:'avante', name:'Avante', icon:'trend', grad:'linear-gradient(135deg,#132F63,#2563EB)', c:'#2563EB', tag:'',
-  desc:'Solução de gestão ágil para pequenas empresas que estão crescendo e precisam de controle simples.', users:'980', prog:21},
+  desc:'Solução de gestão ágil para pequenas empresas que estão crescendo e precisam de controle simples.'},
 ];
 
 const CAT_ICONS = {'Primeiros passos':'rocket','Cadastros':'file','Produtos e estoque':'box','Clientes e fornecedores':'users','Compras e entrada de notas':'truck','Vendas e faturamento':'cart','Financeiro':'cash','Emissão de NF-e e NFC-e':'receipt','Relatórios':'chart','Configurações do sistema':'gear','Frente de caixa (PDV)':'card','Integrações':'plug','Promoções e preços':'tag','Marketplaces':'store','Painéis e indicadores':'sliders','Novidades da versão':'sparkle'};
@@ -1924,8 +1924,13 @@ function apiUpload(url, form, onProgress){
 async function loadState(){
   try{ const r=await fetch('/api/state',{credentials:'same-origin',headers:{'Accept':'application/json'}}); STATE=Object.assign({modules:[],lessons:[],users:[]},await r.json()); SERVER_OK=true }
   catch(e){ SERVER_OK=false; STATE={csrf:'',me:null,systems:[],modules:[],lessons:[],users:[]} }
-  applyState(); return STATE;
+  applyState(); loginStats(); return STATE;
 }
+function loginStats(){ const st=STATE.stats; if(!st) return; const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v};
+  set('ls-v',st.videos); set('ls-s',st.systems); set('ls-m',st.modules) }
+/* números reais (só aulas com vídeo publicado) */
+const realLessons = () => SYS.flatMap(s=>(SYS_CATS[s.id]||[]).flatMap((c,ci)=>canCat(s.id,ci)?lessonsOf(s.id,ci):[]));
+const fmtHoras = min => min<60?min+' min':Math.floor(min/60)+'h'+(min%60?String(min%60).padStart(2,'0'):'');
 function applyState(){
   (STATE.systems||[]).forEach(x=>{ const s=sysById(x.id); if(s){ s.name=x.name; if(x.desc) s.desc=x.desc } });
   Object.keys(SYS_CATS).forEach(k=>SYS_CATS[k]=[]); MOD_BY={};
@@ -1991,7 +1996,7 @@ function firstLesson(){ const s=allowedSys()[0]; if(!s) return null; const ci=al
 function permSummary(u){ const p=permsOf(u)||{}; const ks=Object.keys(p).filter(k=>p[k]&&p[k].length&&sysById(k));
   return {sys:ks.length, mods:ks.reduce((a,k)=>a+p[k].length,0), names:ks.map(k=>sysById(k).name)} }
 const countLessons = id => SYS_CATS[id].reduce((a,c,ci)=>a+lessonsOf(id,ci).length,0);
-const totalMin = id => Math.round(SYS_CATS[id].reduce((a,c,ci)=>a+lessonsOf(id,ci).reduce((x,l)=>x+durSec(l.dur),0),0)/60);
+const totalMin = id => Math.round(SYS_CATS[id].reduce((a,c,ci)=>a+lessonsOf(id,ci).reduce((x,l)=>x+(l.vid?durSec(l.dur):0),0),0)/60);
 
 /* ============ COMPONENTS ============ */
 function thumb(sys, cat, title, dur, opts={}){
@@ -2013,7 +2018,6 @@ function thumb(sys, cat, title, dur, opts={}){
 }
 function lessonCard(sid, ci, li, opts={}){
   const s=sysById(sid), cat=SYS_CATS[sid][ci], l=lessonsOf(sid,ci)[li]; if(!l) return '';
-  const views = l.isNew ? 0 : ((ci*7+li*13)%40+3)*37;
   return `<article class="card" onclick="go('#/aula/${sid}/${ci}/${li}')">
     ${thumb(s,cat,l.t,l.dur,{...opts, yt:l.yt,img:l.img,file:l.file, isNew:opts.isNew||l.isNew})}
     <div class="card-b">
@@ -2021,7 +2025,7 @@ function lessonCard(sid, ci, li, opts={}){
       <h3>${esc(l.t)}</h3>
       <p>${esc(l.d)}</p>
       <div class="card-f">
-        <div class="meta">${l.dur?`<span>${I('clock')}${l.dur}</span>`:''}${l.isNew?`<span>${I('sparkle')}${ago(l.created)}</span>`:`<span>${I('users')}${views.toLocaleString('pt-BR')}</span>`}</div>
+        <div class="meta">${l.dur?`<span>${I('clock')}${l.dur}</span>`:''}${l.isNew?`<span>${I('sparkle')}${ago(l.created)}</span>`:(l.vid?'':`<span>${I('clock')}Em breve</span>`)}</div>
         <button class="watch">${PLAY} Assistir</button>
       </div>
     </div>
@@ -2032,7 +2036,7 @@ function lessonCard(sid, ci, li, opts={}){
 let NAV_ACTIVE='inicio';
 function renderNav(active){
   if(active!==undefined) NAV_ACTIVE=active; active=NAV_ACTIVE;
-  const items=[['inicio','home','Início'],['sistemas','grid','Sistemas'],['meus','book','Meus cursos','6'],['fav','heart','Favoritos','14'],['trilhas','route','Trilhas de aprendizado'],['cert','award','Certificados','3']];
+  const items=[['inicio','home','Início'],['sistemas','grid','Sistemas']];
   let h=`<div class="nav-t" style="padding-top:0">Menu</div>`;
   h+=items.map(([k,ic,t,c])=>`<a class="${active===k?'on':''}" href="${['inicio','sistemas'].includes(k)?'#/'+k:'#'}" ${['inicio','sistemas'].includes(k)?'':'data-act="soon"'}>${I(ic)}${t}${c?`<span class="cnt">${c}</span>`:''}</a>`).join('');
   h+=`<div class="nav-t">Sistemas</div>`;
@@ -2085,7 +2089,7 @@ function sysCard(s){
     <div class="sys-b">
       <h3>${s.name}</h3>
       <p>${s.desc}</p>
-      <div class="sys-meta"><span>${I('video')}${countAllowed(s.id)} aulas</span><span>${I('clock')}${Math.round(totalMin(s.id)/6)/10}h</span></div>
+      <div class="sys-meta"><span>${I('video')}${countAllowed(s.id)} aulas</span>${totalMin(s.id)?`<span>${I('clock')}${fmtHoras(totalMin(s.id))} de vídeo</span>`:''}</div>
       <button class="sys-btn">Acessar treinamentos ${I('arrow')}</button>
     </div>
   </div>`;
@@ -2105,7 +2109,7 @@ function pInicio(){
   <div class="hero">
     <span class="mark"></span>
     <div class="hero-c">
-      <span class="pill"><i></i> 12 novas aulas publicadas esta semana</span>
+      ${(()=>{const n=realLessons().filter(l=>l.vid&&!l.base&&(Date.now()-(l.created||0))<7*864e5).length;return n?`<span class="pill"><i></i> ${n} ${n>1?'novas aulas publicadas':'nova aula publicada'} esta semana</span>`:''})()}
       <h1>Domine os sistemas <span>InfotecSoft</span> com aulas rápidas e práticas</h1>
       <p>Treinamentos em vídeo, do básico ao avançado, para você e sua equipe usarem o ERP com confiança — no seu tempo, de onde estiver.</p>
       <div class="hero-btns">
@@ -2118,19 +2122,18 @@ function pInicio(){
         <div class="mock-v"><span class="pl">${PLAY}</span><div class="mock-bar"><i></i></div></div>
         <div class="mock-l"><div><b></b><s></s></div></div>
       </div>
-      <div class="float-badge fb1"><span class="bi" style="background:#DCFCE7;color:#16A34A">${I('checkc')}</span><div>Aula concluída!<small>Emitindo uma NF-e</small></div></div>
-      <div class="float-badge fb2"><span class="bi" style="background:var(--sky);color:var(--blue)">${I('award')}</span><div>Certificado<small>Fusion Web · Básico</small></div></div>
     </div>
   </div>
 
   <div class="stats">
-    <div class="stat"><span class="si">${I('video')}</span><div><b>${482+videos().filter(v=>v.li==null).length}</b><small>videoaulas disponíveis</small></div></div>
-    <div class="stat"><span class="si">${I('grid')}</span><div><b>5</b><small>sistemas ERP</small></div></div>
-    <div class="stat"><span class="si">${I('clock')}</span><div><b>64h</b><small>de conteúdo</small></div></div>
-    <div class="stat"><span class="si">${I('award')}</span><div><b>3</b><small>certificados conquistados</small></div></div>
+    ${(()=>{const rl=realLessons(), wv=rl.filter(l=>l.vid), min=Math.round(wv.reduce((a,l)=>a+durSec(l.dur),0)/60), sy=allowedSys(), md=sy.reduce((a,s)=>a+allowedCats(s.id).length,0);
+      return `<div class="stat"><span class="si">${I('video')}</span><div><b>${wv.length}</b><small>videoaulas disponíveis</small></div></div>
+    <div class="stat"><span class="si">${I('grid')}</span><div><b>${sy.length}</b><small>${sy.length===1?'sistema liberado':'sistemas liberados'}</small></div></div>
+    <div class="stat"><span class="si">${I('book')}</span><div><b>${md}</b><small>${md===1?'módulo':'módulos'}</small></div></div>
+    <div class="stat"><span class="si">${I('clock')}</span><div><b>${min?fmtHoras(min):'—'}</b><small>de vídeo publicado</small></div></div>`})()}
   </div>
 
-  ${contOk?`<div class="sec">
+  ${false?`<div class="sec">
     <div class="sec-h"><div><h2>Continue de onde parou</h2></div></div>
     <div class="cont" onclick="go('#/aula/fusion-web/7/1')" style="cursor:pointer">
       ${thumb(SYS[0],'Emissão de NF-e e NFC-e','',null,{w:62})}
@@ -2182,10 +2185,10 @@ function pSistemas(){
       <div class="sb-r">
         <p>${s.desc}</p>
         ${ok?'':`<span class="lock-badge">${I('lock')}Sem acesso</span>`}
-        <div class="sb-k"><div><b>${ok?countAllowed(s.id):countLessons(s.id)}</b><small>aulas</small></div><div><b>${ok?allowedCats(s.id).length:cats.length}</b><small>${ok&&allowedCats(s.id).length<cats.length?'módulos liberados':'categorias'}</small></div><div><b>${s.users}</b><small>alunos</small></div></div>
+        <div class="sb-k"><div><b>${ok?countAllowed(s.id):countLessons(s.id)}</b><small>aulas</small></div><div><b>${ok?allowedCats(s.id).length:cats.length}</b><small>${ok&&allowedCats(s.id).length<cats.length?'módulos liberados':'categorias'}</small></div><div><b>${(SYS_CATS[s.id]||[]).reduce((a,c,ci)=>a+(ok&&!canCat(s.id,ci)?0:lessonsOf(s.id,ci).filter(l=>l.vid).length),0)}</b><small>com vídeo</small></div></div>
         ${(()=>{const tg=ok?allowedCats(s.id).map(i=>cats[i]):cats;return `<div class="sb-tags">${tg.slice(0,5).map(c=>`<span>${c}</span>`).join('')}${tg.length>5?`<span>+${tg.length-5}</span>`:''}</div>`})()}
         <div class="sb-f">
-          <div class="sb-prog" ${ok?'':'style="visibility:hidden"'}><small>${s.prog?`Seu progresso: <b style="color:var(--ink)">${s.prog}%</b>`:'Você ainda não começou'}</small><div class="prog" style="margin-top:6px"><i style="width:${s.prog}%"></i></div></div>
+
           ${ok?`<button class="btn btn-p">Acessar treinamentos ${I('arrow')}</button>`:`<button class="btn btn-o">${I('lock')} Solicitar acesso</button>`}
         </div>
       </div>
@@ -2204,9 +2207,9 @@ function pSistema(sid){
     <div class="sh-c">
       <h1>Treinamentos ${s.name}</h1>
       <p>${s.desc}</p>
-      <div class="sh-m"><span>${I('video')}${NL} aulas</span><span>${I('grid')}${part?AC.length+' de '+cats.length+' módulos liberados':cats.length+' categorias'}</span><span>${I('clock')}${Math.floor(totalMin(s.id)/60)}h${String(totalMin(s.id)%60).padStart(2,'0')} de conteúdo</span><span>${I('award')}Certificado ao concluir</span></div>
+      <div class="sh-m"><span>${I('video')}${NL} aulas</span><span>${I('grid')}${part?AC.length+' de '+cats.length+' módulos liberados':cats.length+' categorias'}</span>${totalMin(s.id)?`<span>${I('clock')}${fmtHoras(totalMin(s.id))} de vídeo</span>`:''}</div>
     </div>
-    <div class="sh-p"><small>Seu progresso</small><b>${s.prog}%</b><div class="prog"><i style="width:${s.prog}%"></i></div></div>
+
   </div>
   <div class="sd">
     <nav class="catnav"><h4>Categorias</h4>
@@ -2225,7 +2228,7 @@ function pSistema(sid){
       <div class="cat-block" id="cat-${ci}">
         <div class="cat-h"><span class="ci" style="background:${s.grad}">${I(CAT_ICONS[c])}</span><div><h2>${c}</h2><small>${ls.length} aulas · Módulo ${ci+1}</small></div>
           <a class="link" onclick="go('#/aula/${s.id}/${ci}/0')" style="cursor:pointer">Assistir módulo ${I('arrow')}</a></div>
-        <div class="l-grid3">${ls.map((l,li)=>lessonCard(s.id,ci,li,{w:l.isNew?0:(s.prog&&ci===0)?100:(s.prog&&ci===1&&li===0?45:0)})).join('')}</div>
+        <div class="l-grid3">${ls.map((l,li)=>lessonCard(s.id,ci,li,{w:0})).join('')}</div>
       </div>`}).join('')}
     </div>
   </div>`;
@@ -2271,7 +2274,7 @@ function pAula(sid,ci,li){
         <div>
           <span class="sys-badge"><span class="sys-dot" style="background:${s.grad}">${I(s.icon)}</span>${s.name} · ${cat}</span>${l.isNew?'<span class="new-inline">NOVO</span>':''}
           <h1>${esc(l.t)}</h1>
-          <div class="lmeta"><span>${I('video')}Aula ${li+1} de ${list.length}</span>${l.dur?`<span>${I('clock')}${l.dur}</span>`:''}${l.isNew?`<span>${I('sparkle')}Publicada ${ago(l.created)}</span>`:`<span>${I('users')}${(((ci*7+li*13)%40+3)*37).toLocaleString('pt-BR')} visualizações</span><span>${I('sparkle')}Atualizada em nov/2026</span>`}</div>
+          <div class="lmeta"><span>${I('video')}Aula ${li+1} de ${list.length}</span>${l.dur?`<span>${I('clock')}${l.dur}</span>`:''}${l.isNew?`<span>${I('sparkle')}Publicada ${ago(l.created)}</span>`:''}</div>
         </div>
         <div class="l-acts">
           ${adm?`<a class="btn btn-o adm-btn" href="${admHref}" title="Visível só para o administrador">${I(l.yt||l.file?'edit':'link')} ${l.yt||l.file?'Alterar vídeo':'Vincular vídeo do YouTube'}</a>`:''}
@@ -2514,7 +2517,7 @@ function vfFile(f){
   const h=$('vf-file-h'); if(!f) return;
   const okType=/^video\//.test(f.type)||/\.(mp4|webm|mov|m4v|ogv)$/i.test(f.name);
   if(!okType){ h.textContent='Esse arquivo não é um vídeo. Use MP4, WebM ou MOV.'; h.className='fm-h bad'; return }
-  if(f.size>4*1073741824){ h.textContent='Arquivo muito grande (máx. 4 GB neste protótipo).'; h.className='fm-h bad'; return }
+  if(f.size>4*1073741824){ h.textContent='Arquivo muito grande (máx. 4 GB).'; h.className='fm-h bad'; return }
   VF.busy=true; VF.file=null; VF.fname=f.name; VF.fsize=f.size; VF.ftype=f.type; VF.thumb=''; vfDropRender();
   const url=URL.createObjectURL(f), vid=document.createElement('video'); vid.muted=true; vid.preload='metadata'; vid.playsInline=true; vid.src=url;
   const done=(ok,msg)=>{ VF.busy=false; if(ok){ VF.file=f; h.textContent=msg||'Vídeo pronto. Ele vai tocar no player do portal.'; h.className='fm-h ok';
@@ -2534,7 +2537,7 @@ function playFile(pl,l){
   pl.innerHTML=`<div class="yt-load"><span class="yt-spin"></span>Carregando vídeo…</div>`;
   Promise.resolve(l.file?`/media/video/${l.file}`:null).then(src=>{
     if(!src){ pl.classList.add('yt-fail'); pl.innerHTML=`<div class="yt-fb">${l.img?`<img class="yt-fb-bg" src="${l.img}" alt="">`:''}<div class="yt-fb-c"><span class="yt-fb-ic fl">${I('video')}</span>
-      <b>Arquivo de vídeo não disponível neste navegador</b><p>Neste protótipo, vídeos enviados do computador ficam guardados só no navegador em que foram publicados${WEB_OK?'':' (e, na pré-visualização, só enquanto a página estiver aberta)'}. No portal final o arquivo fica no servidor e toca para todos os alunos.</p>
+      <b>Arquivo de vídeo não encontrado</b><p>O arquivo desta aula não está disponível no servidor no momento.</p>
       ${can('videos')?`<div class="yt-fb-b"><a class="btn btn-g" href="#/videos/edit/${l.file}">${I('edit')} Enviar o arquivo de novo</a></div>`:''}</div></div>`; return }
     pl.innerHTML=`<video class="yt-frame file-v" src="${src}" controls autoplay playsinline preload="metadata" ${l.img?`poster="${l.img}"`:''}></video>`;
     const v=pl.querySelector('video'); v.play&&v.play().catch(()=>{});
