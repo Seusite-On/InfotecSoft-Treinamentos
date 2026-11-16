@@ -62,8 +62,8 @@ if (is_https()) {
     header("Strict-Transport-Security: max-age=31536000; includeSubDomains");
 }
 header("Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; "
-    . "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-    . "img-src 'self' data: blob: https://img.youtube.com https://i.ytimg.com; font-src 'self' data: https://fonts.gstatic.com; "
+    . "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    . "img-src 'self' data: blob: https://img.youtube.com https://i.ytimg.com https://*.ytimg.com; font-src 'self' data: https://fonts.gstatic.com; "
     . "connect-src 'self'; media-src 'self' blob:; frame-src https://www.youtube-nocookie.com https://www.youtube.com"
     . (is_https() ? "; upgrade-insecure-requests" : ""));
 
