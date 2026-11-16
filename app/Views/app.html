@@ -2285,23 +2285,13 @@ function pAula(sid,ci,li){
         </div>
       </div>
 
-      <div class="tabs"><button class="on">${I('file')}Descrição</button><button onclick="soon()">${I('down')}Materiais</button><button onclick="soon()">${I('msg')}Dúvidas <span class="cnt" style="font-size:12px;background:var(--bg);padding:1px 7px;border-radius:10px">8</span></button></div>
+      <div class="tabs"><button class="on">${I('file')}Descrição</button></div>
       <div class="desc">
         <h3>Sobre esta aula</h3>
         ${l.isNew?`<p>${esc(l.d)||'Vídeo publicado pela equipe InfotecSoft.'}</p>
         <p class="desc-pub">${I('calendar')} Publicada pela equipe InfotecSoft em ${fmtDate(l.created)}</p>`:`
-        <p>${esc(l.d)} Nesta aula, você acompanha a tela do <b>${s.name}</b> enquanto o instrutor executa cada etapa com calma, explicando o porquê de cada campo. Ao final, você estará pronto para repetir o processo sozinho na sua empresa.</p>
-        <ul>
-          <li>${I('checkc')}Onde encontrar a rotina no menu</li>
-          <li>${I('checkc')}Preenchimento correto de cada campo</li>
-          <li>${I('checkc')}Erros mais comuns e como evitá-los</li>
-          <li>${I('checkc')}Dicas para ganhar tempo no dia a dia</li>
-        </ul>
-        <h3>Materiais de apoio</h3>
-        <div class="files">
-          <div class="file"><span class="fi">${I('file')}</span><div><b>Guia passo a passo.pdf</b><small>PDF · 1,2 MB</small></div></div>
-          <div class="file"><span class="fi" style="background:#DCFCE7;color:#16A34A">${I('file')}</span><div><b>Checklist da rotina.xlsx</b><small>Planilha · 48 KB</small></div></div>
-        </div>`}
+        <p>${esc(l.d)}</p>
+        ${l.vid?'':`<p class="desc-pub">${I('clock')} O vídeo desta aula será publicado em breve.</p>`}`}
       </div>
 
       <div class="nextbar">
