@@ -1,0 +1,42 @@
+PORTAL INFOTECSOFT TREINAMENTOS - COM BANCO DE DADOS (MySQL)
+=============================================================
+
+Mesmo padrao do seu sistema-pdv-main (Stok Net): PHP + MySQL do Laragon,
+.env, migrations em database/migrations e os mesmos .bat.
+
+PRIMEIRA VEZ
+1. Abra o Laragon e clique em "Iniciar tudo" (o MySQL precisa estar ligado).
+2. De dois cliques em  iniciar-servidor.bat  (so isso!)
+   -> cria o .env, o banco "treinamentos", as tabelas e o admin,
+      e abre o portal em http://localhost:8001
+3. (Opcional, uma vez) De dois cliques em  popular-banco-teste.bat
+   -> cria alunos e equipe de teste (senha de todos: 123456).
+   Deixe a janela preta aberta enquanto usa o portal.
+4. Nas proximas vezes: so o iniciar-servidor.bat de novo.
+
+LOGIN INICIAL
+- admin / 123   (troque em "Meu perfil" no primeiro acesso)
+
+USUARIOS DE TESTE (se rodou o popular-banco-teste.bat) - senha 123456
+- juliano  : aluno com 3 modulos do Fusion Web
+- carlos   : aluno do E-Trade
+- marcos   : equipe (Instrutor: modulos e videos)
+- juliana.lima, ricardo.souza, patricia : cadastros aguardando aprovacao
+
+VER NO DBEAVER
+- Use a mesma conexao MySQL do sistema-pdv (localhost:3306, usuario root).
+- Clique com o botao direito na conexao > Atualizar (F5).
+  O banco "treinamentos" aparece na lista.
+- Tabelas: systems, modules, lessons, users, user_permissions,
+  user_module_access, migrations.
+
+VIDEOS
+- YouTube: o video precisa estar "Publico" ou "Nao listado" e com
+  "Permitir incorporacao" marcado no YouTube Studio.
+- Arquivo do computador: fica salvo em storage\videos (ate 2 GB por video).
+
+TESTE RAPIDO
+- php tests\smoke.php  (confere conexao, tabelas e admin)
+
+Os arquivos antigos do prototipo (index.html na raiz, Abrir Portal.bat,
+servidor-local.ps1) nao sao mais usados e podem ser apagados.

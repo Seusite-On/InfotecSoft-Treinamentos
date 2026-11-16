@@ -1,0 +1,8 @@
+/vendor/
+.env
+/storage/security/*.json
+/storage/videos/*
+/storage/thumbs/*
+/storage/*.txt
+!/storage/videos/.gitkeep
+!/storage/thumbs/.gitkeep

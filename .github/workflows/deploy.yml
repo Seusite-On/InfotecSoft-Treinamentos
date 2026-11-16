@@ -1,0 +1,58 @@
+# Publica o portal na VPS da Hostinger a cada "git push" na branch main.
+# Configure uma vez em GitHub > Settings > Secrets and variables > Actions:
+#   VPS_HOST     IP da VPS (hPanel > VPS > Visão geral)
+#   VPS_USER     deploy            (usuário criado pelo deploy/setup-vps.sh)
+#   VPS_PORT     22
+#   VPS_SSH_KEY  chave privada mostrada no final do setup-vps.sh
+#   APP_DIR      /var/www/treinamentos
+name: Publicar na VPS (Hostinger)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-producao
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HOST: ${{ secrets.VPS_HOST }}
+      USER: ${{ secrets.VPS_USER }}
+      PORT: ${{ secrets.VPS_PORT || '22' }}
+      DIR: ${{ secrets.APP_DIR || '/var/www/treinamentos' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir sintaxe do PHP
+        run: |
+          find . -name "*.php" -not -path "./vendor/*" -print0 | xargs -0 -n1 php -l > /dev/null
+          echo "PHP sem erros de sintaxe."
+
+      - name: Preparar acesso SSH
+        run: |
+          test -n "$HOST" || { echo "::error::Secret VPS_HOST não configurado"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Enviar arquivos para a VPS
+        run: |
+          rsync -az --delete \
+            --exclude '.git/' --exclude '.github/' --exclude 'frontend/' --exclude 'deploy/' \
+            --exclude '.env' --exclude 'vendor/' \
+            --exclude 'storage/videos/' --exclude 'storage/thumbs/' --exclude 'storage/security/' --exclude 'storage/*.txt' \
+            --exclude '/*.bat' --exclude '/*.ps1' --exclude '/index.html' --exclude '/LEIA-ME.txt' \
+            -e "ssh -i ~/.ssh/deploy_key -p $PORT" ./ "$USER@$HOST:$DIR/"
+
+      - name: Atualizar banco de dados e testar
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" "cd '$DIR' && php database/scripts/run_all.php && php tests/smoke.php"
+
+      - name: Conferir se o site responde
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" "curl -s -o /dev/null -w 'HTTP %{http_code}\n' -H 'Host: localhost' http://127.0.0.1/api/state || true"
