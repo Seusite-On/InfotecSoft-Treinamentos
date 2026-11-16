@@ -1,0 +1,5 @@
+-- Novo sistema "Balanças" com o módulo de configuração e o primeiro vídeo
+INSERT IGNORE INTO systems (system_id, name, description, position) VALUES ('balancas', 'Balanças', 'Configuração e integração de balanças com os sistemas.', 5);
+INSERT IGNORE INTO modules (system_id, name, icon, position) VALUES ('balancas', 'Configuração de balanças', 'scale', 1);
+INSERT INTO lessons (module_id, title, description, duration, position, origin, video_source, youtube_id, video_updated_at, created_at, updated_at) SELECT m.module_id, 'Como configurar as balanças Prix 4 Uno nas redes via cabo e WiFi', 'Passo a passo para ligar a balança Toledo Prix 4 Uno na rede, por cabo ou WiFi.', '8:17', 1, 'admin', 'youtube', '5R5_ArgyMyA', NOW(), NOW(), NOW() FROM modules m WHERE m.system_id = 'balancas' AND m.name = 'Configuração de balanças' AND NOT EXISTS (SELECT 1 FROM (SELECT youtube_id FROM lessons) x WHERE x.youtube_id = '5R5_ArgyMyA');
+INSERT IGNORE INTO user_module_access (user_id, module_id, created_at) SELECT u.user_id, m.module_id, NOW() FROM users u JOIN modules m ON m.system_id = 'balancas' WHERE u.role = 'user' AND u.status = 'aprovado';
