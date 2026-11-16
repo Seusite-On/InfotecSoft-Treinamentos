@@ -17,9 +17,18 @@ class MediaController extends Controller
         exit;
     }
 
-    public function video(string $id): void
+    /** Logado, com cadastro aprovado. */
+    private function guard(): void
     {
         if (!Auth::check()) $this->deny(401);
+        $row = (new UserRepository())->find((int) Auth::id());
+        if (!$row || $row['status'] !== 'aprovado') $this->deny(401);
+    }
+
+    public function video(string $id): void
+    {
+        $this->guard();
+        if (!ctype_digit($id)) $this->deny(404);
         $l = (new LessonRepository())->find((int) $id);
         if (!$l || $l['video_source'] !== 'file' || !$l['file_path']) $this->deny(404);
         $can = Gate::allows('videos') || Gate::allows('modulos')
@@ -32,7 +41,10 @@ class MediaController extends Controller
         $size = filesize($path);
         $start = 0;
         $end = $size - 1;
-        header('Content-Type: ' . ($l['file_mime'] ?: 'video/mp4'));
+        $mime = in_array($l['file_mime'], \App\Services\MediaStorage::VIDEO_EXT, true) ? $l['file_mime'] : 'video/mp4';
+        header('Content-Type: ' . $mime);
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Disposition: inline');
         header('Accept-Ranges: bytes');
         header('Cache-Control: private, max-age=3600');
         if (isset($_SERVER['HTTP_RANGE']) && preg_match('/bytes=(\d*)-(\d*)/', $_SERVER['HTTP_RANGE'], $m)) {
@@ -61,7 +73,8 @@ class MediaController extends Controller
 
     public function thumb(string $id): void
     {
-        if (!Auth::check()) $this->deny(401);
+        $this->guard();
+        if (!ctype_digit($id)) $this->deny(404);
         $l = (new LessonRepository())->find((int) $id);
         if (!$l || !$l['thumb_path']) $this->deny(404);
         $path = BASE_PATH . '/storage/thumbs/' . basename($l['thumb_path']);

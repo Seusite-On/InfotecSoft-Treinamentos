@@ -18,6 +18,7 @@ class UserService
     {
         $u = $this->users->find($id);
         if (!$u || $u['role'] === 'admin') return ['ok' => false, 'status' => 404, 'message' => 'Usuário não encontrado.'];
+        if ($id === (int) Auth::id()) return ['ok' => false, 'status' => 403, 'message' => 'Você não pode alterar o próprio cadastro.'];
         if (!in_array($status, ['aprovado', 'recusado'], true)) return ['ok' => false, 'status' => 422, 'message' => 'Status inválido.'];
         $by = Auth::id();
         $this->users->update($id, [
@@ -40,9 +41,10 @@ class UserService
         $valid = array_column($this->modules->all(), 'module_id');
         $valid = array_map('intval', $valid);
         $ids = array_values(array_intersect(array_map('intval', $moduleIds), $valid));
+        if ($adm !== null && !Gate::isAdmin()) return ['ok' => false, 'status' => 403, 'message' => 'Somente o administrador principal altera o acesso administrativo.'];
+        if ((int) $id === (int) Auth::id() && !Gate::isAdmin()) return ['ok' => false, 'status' => 403, 'message' => 'Você não pode alterar as próprias permissões.'];
         $this->users->setModuleAccess($id, $ids, Auth::id());
         if ($adm !== null) {
-            if (!Gate::isAdmin()) return ['ok' => false, 'status' => 403, 'message' => 'Somente o administrador principal altera o acesso administrativo.'];
             $cols = [];
             foreach (Gate::MAP as $code => $col) {
                 $cols[$col] = in_array($code, $adm, true) ? 1 : 0;

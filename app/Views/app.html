@@ -1186,6 +1186,8 @@ html[data-theme="dark"] .pu-role{background:var(--blue)}
 .pf-tip svg.i{width:16px;height:16px;color:var(--blue)}
 .pl-i .th .file-tag{display:none}
 @media(max-width:900px){.pf{grid-template-columns:1fr}}
+.pf-tip.pf-warn{background:#FEF3C7;color:#92400E;align-items:flex-start}.pf-tip.pf-warn svg.i{color:#D97706}
+[data-theme="dark"] .pf-tip.pf-warn{background:rgba(217,119,6,.15);color:#FCD34D}
 
 /* =====================================================================
    CAMADA MOBILE / TABLET — carregada por último, sobrescreve o resto.
@@ -1706,7 +1708,7 @@ html[data-theme="dark"] .pl-h h3{color:var(--ink)!important}
     <div class="side-card">
       <span class="mark"></span>
       <b>Precisa de ajuda ao vivo?</b>
-      <p>Nosso suporte técnico atende de seg. a sáb., das 8h às 18h.</p>
+      <p>Fale com o suporte técnico da InfotecSoft.</p>
       <button>Abrir chamado</button>
     </div>
   </aside>
@@ -1806,7 +1808,7 @@ const I = (n,c='') => `<svg class="i ${c}"><use href="#i-${n}"/></svg>`;
 const PLAY = `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M7 4v16l13-8z"/></svg>`;
 
 const SYS = [
- {id:'fusion-web', name:'Fusion Web', icon:'globe', grad:'linear-gradient(135deg,#0E3A7E,#1A5FD0)', c:'#1A5FD0', tag:'MAIS USADO',
+ {id:'fusion-web', name:'Fusion Web', icon:'globe', grad:'linear-gradient(135deg,#0E3A7E,#1A5FD0)', c:'#1A5FD0', tag:'',
   desc:'ERP completo na nuvem para gestão comercial, fiscal e financeira, acessível de qualquer navegador.'},
  {id:'fusion-web-2', name:'Fusion Web 2.0', icon:'cloud', grad:'linear-gradient(135deg,#0B4F8A,#0EA5E9)', c:'#0E8BD0', tag:'NOVO',
   desc:'A nova geração do Fusion Web: interface renovada, painéis inteligentes e operações mais rápidas.'},
@@ -2097,9 +2099,8 @@ function sysCard(s){
 
 function pInicio(){
   const featured=[['fusion-web',7,1],['fusion-desktop',3,0],['fusion-web-2',0,0],['e-trade',3,0]];
-  const staticRecent=[['fusion-web-2',2,0,'há 2 dias'],['fusion-web',6,3,'há 3 dias'],['avante',4,0,'há 4 dias'],['e-trade',6,1,'há 5 dias'],['fusion-desktop',7,2,'há 6 dias'],['fusion-web',4,0,'há 1 semana']];
   const dyn=videos().slice().sort((a,b)=>b.created-a.created).map(v=>{const a=videoAddr(v);return a&&[v.sys,a.ci,a.li,ago(v.created)]}).filter(Boolean);
-  const recent=dyn.concat(staticRecent).filter(r=>canCat(r[0],r[1])).slice(0,6);
+  const recent=dyn.filter(r=>canCat(r[0],r[1])).slice(0,6);
   const featOk=featured.filter(f=>canCat(f[0],f[1]));
   const fl=firstLesson(), contOk=canCat('fusion-web',7);
   let cats=[['Primeiros passos',42],['Cadastros',36],['Produtos e estoque',58],['Vendas e faturamento',64],['Financeiro',51],['Emissão de NF-e e NFC-e',47],['Compras e entrada de notas',33],['Frente de caixa (PDV)',29],['Relatórios',38],['Configurações do sistema',31]];
@@ -2153,20 +2154,20 @@ function pInicio(){
   </div>
 
   <div class="sec">
-    <div class="sec-h"><div><h2>${I('fire')} Treinamentos em destaque</h2><p>Os mais assistidos pelos clientes neste mês.</p></div><a class="link" href="#/sistemas">Explorar ${I('arrow')}</a></div>
+    <div class="sec-h"><div><h2>${I('fire')} Comece por aqui</h2><p>Aulas sugeridas para quem está começando.</p></div><a class="link" href="#/sistemas">Explorar ${I('arrow')}</a></div>
     ${featOk.length?'':'<!--'}<div class="l-grid4">${featOk.map(f=>lessonCard(f[0],f[1],f[2],{showSys:false})).join('')}</div>${featOk.length?'':'-->'}${featOk.length?'':`<div class="perm-empty sm">${I('lock')}<small>Os destaques aparecem conforme os módulos liberados para você.</small></div>`}
   </div>
 
-  <div class="sec">
+  ${recent.length?'':'<!--'}<div class="sec">
     <div class="sec-h"><div><h2>Adicionados recentemente</h2><p>Novos vídeos publicados pela equipe InfotecSoft.</p></div>${can('videos')?`<a class="link" href="#/videos">${I('plus')} Publicar vídeo</a>`:`<a class="link" href="#" data-act="soon">Ver todos ${I('arrow')}</a>`}</div>
     <div class="recent">${recent.map(([sid,ci,li,when])=>{const s=sysById(sid),cat=SYS_CATS[sid][ci],l=lessonsOf(sid,ci)[li]; if(!l) return '';
       return `<div class="ritem" onclick="go('#/aula/${sid}/${ci}/${li}')">${thumb(s,cat,'',l.dur,{isNew:true,yt:l.yt,img:l.img,file:l.file,noTag:true})}
       <div><span class="chip" style="background:var(--sky);color:${s.c}">${s.name}</span>${l.yt?`<span class="chip chip-yt">${I('yt')}YouTube</span>`:''}<h4>${esc(l.t)}</h4><small>${cat} · ${when}</small></div></div>`}).join('')}</div>
-  </div>
+  </div>${recent.length?'':'-->'}
 
   <div class="sec">
     <div class="sec-h"><div><h2>Categorias de treinamento</h2><p>Encontre aulas pelo assunto, em qualquer sistema.</p></div></div>
-    <div class="cats">${cats.map(([c,n])=>`<div class="cat" onclick="go('${catTarget(c)||'#/sistemas'}')"><span class="ci">${I(CAT_ICONS[c])}</span><div><b>${c}</b><br><small>${n} aulas</small></div></div>`).join('')}</div>
+    <div class="cats">${cats.map(([c])=>[c,allowedSys().reduce((a,s)=>{const ci=SYS_CATS[s.id].indexOf(c);return a+(ci>=0&&canCat(s.id,ci)?lessonsOf(s.id,ci).length:0)},0)]).filter(x=>x[1]>0).map(([c,n])=>`<div class="cat" onclick="go('${catTarget(c)||'#/sistemas'}')"><span class="ci">${I(CAT_ICONS[c])}</span><div><b>${c}</b><br><small>${n} aulas</small></div></div>`).join('')}</div>
   </div>`;
 }
 
@@ -2174,7 +2175,7 @@ function pSistemas(){
   return `
   <div class="crumb"><a href="#/inicio">${I('home')}</a>${I('chev')}<b>Sistemas</b></div>
   <div class="ph"><div><h1>Selecione seu sistema</h1><p>Cada sistema possui uma trilha completa de treinamentos, organizada por assunto.</p></div>
-    <div class="seg"><button class="on">Todos</button><button>Web</button><button>Desktop</button><button>Em andamento</button></div></div>
+</div>
   <div class="sys-big">${SYS.slice().sort((a,b)=>canSys(b.id)-canSys(a.id)).map(s=>{const cats=SYS_CATS[s.id], ok=canSys(s.id);return `
     <div class="sb${ok?'':' sb-locked'}" onclick="${ok?`go('#/sistema/${s.id}')`:`toast('Você não tem acesso ao ${s.name}. Solicite ao administrador.','warn')`}">
       <div class="sb-l" style="background:${s.grad}">
@@ -2555,9 +2556,9 @@ function pPerfil(){
       <small>${esc(me.empresa||'')} · usuário <code>${esc(me.usuario||'')}</code></small>
       <small class="pe-req">${I('shield')}${me.admin?'Administrador principal':isStaff()?'Equipe · '+roleOf(me.adm):'Aluno'}${!me.admin?` · ${sm.sys} sistema(s), ${sm.mods} módulo(s)`:''}</small></div></div></section>
     <section class="pf-card"><h3>${I('lock')} Trocar senha</h3>
-      ${me.admin?`<p class="pf-tip">${I('help')} Se você ainda usa a senha inicial <b>123</b>, troque agora.</p>`:''}
+      ${me.must_change?`<p class="pf-tip pf-warn">${I('shield')} <b>Por segurança, crie uma nova senha para continuar.</b> Sua senha atual é fraca ou é a senha inicial do sistema.</p>`:''}
       <label class="fm"><span>Senha atual</span><input class="inp" type="password" id="pf-cur" autocomplete="current-password"></label>
-      <label class="fm"><span>Nova senha</span><input class="inp" type="password" id="pf-new" autocomplete="new-password"><small class="fm-h">Mínimo de 6 caracteres, com letras e números.</small></label>
+      <label class="fm"><span>Nova senha</span><input class="inp" type="password" id="pf-new" autocomplete="new-password"><small class="fm-h">Mínimo de 8 caracteres, com letras e números.</small></label>
       <label class="fm"><span>Repita a nova senha</span><input class="inp" type="password" id="pf-new2" autocomplete="new-password" onkeydown="if(event.key==='Enter')pfSave()"></label>
       <div class="md-err" id="pf-err"></div>
       <button type="button" class="btn btn-p" onclick="pfSave()">${I('check')} Salvar nova senha</button></section>
@@ -2567,8 +2568,10 @@ async function pfSave(){
   const c=$('pf-cur').value, n=$('pf-new').value, n2=$('pf-new2').value;
   if(!c||!n) return modErr('pf-err','Preencha a senha atual e a nova senha.');
   if(n!==n2) return modErr('pf-err','As novas senhas não conferem.');
+  if(n.length<8||!/[a-zA-Z]/.test(n)||!/\d/.test(n)) return modErr('pf-err','A nova senha precisa ter pelo menos 8 caracteres, com letras e números.');
   try{ await api('POST','/api/password',{current:c,new:n}) }catch(err){ return modErr('pf-err',err.message) }
-  ['pf-cur','pf-new','pf-new2'].forEach(k=>$(k).value=''); modErr('pf-err',''); toast('Senha alterada com sucesso.','ok');
+  ['pf-cur','pf-new','pf-new2'].forEach(k=>$(k).value=''); modErr('pf-err','');
+  const was=STATE.me&&STATE.me.must_change; await loadState(); toast('Senha alterada com sucesso.','ok'); if(was) go('#/inicio');
 }
 
 /* ============ ADMIN · MÓDULOS ============ */
@@ -2919,6 +2922,7 @@ function route(){
   if(page==='login'||!page){if(me){CUR='#/inicio';return route()}setTimeout(()=>{const x=document.getElementById('em');x&&document.getElementById('l-signin').classList.contains('on')&&x.focus()},400);document.getElementById('login').classList.remove('hide');document.getElementById('app').classList.remove('show');return}
   document.getElementById('login').classList.add('hide');document.getElementById('app').classList.add('show');
   renderHeader();
+  if(STATE.me&&STATE.me.must_change&&page!=='perfil'){CUR='#/perfil';toast('Por segurança, troque sua senha antes de continuar.','warn');return route()}
   const NEED={aprovacoes:'aprovacoes',usuarios:'usuarios',videos:'videos',modulos:'modulos'};
   if(NEED[page]&&!can(NEED[page])){CUR='#/inicio';toast('Você não tem permissão para acessar esta área.','warn');return route()}
   if(page==='inicio'){renderNav('inicio');p('inicio',pInicio())}
@@ -3057,9 +3061,9 @@ function validCNPJ(d){if(d.length!==14||/^(\d)\1+$/.test(d))return false;const d
 function maskDoc(v){const d=v.replace(/\D/g,'').slice(0,14);
   if(d.length<=11) return d.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');
   return d.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2')}
-function pwScore(p){let s=0;if(p.length>=6)s++;if(p.length>=10)s++;if(/[a-zA-Z]/.test(p)&&/\d/.test(p))s++;if(/[^a-zA-Z0-9]/.test(p)||/[A-Z]/.test(p)&&/[a-z]/.test(p))s++;return p?Math.max(1,s):0}
+function pwScore(p){let s=0;if(p.length>=8)s++;if(p.length>=12)s++;if(/[a-zA-Z]/.test(p)&&/\d/.test(p))s++;if(/[^a-zA-Z0-9]/.test(p)||/[A-Z]/.test(p)&&/[a-z]/.test(p))s++;return p?Math.max(1,s):0}
 function rgMeter(){const s=pwScore($('rg-pw').value), m=$('pw-meter');m.dataset.s=s;
-  m.querySelector('span').textContent=['Use ao menos 6 caracteres, com letras e números.','Senha fraca','Senha razoável','Senha boa','Senha forte'][s]}
+  m.querySelector('span').textContent=['Use ao menos 8 caracteres, com letras e números.','Senha fraca','Senha razoável','Senha boa','Senha forte'][s]}
 function doRegister(){
   rgClear(); const v={}; RG.forEach(k=>v[k]=$('rg-'+k).value.trim()); v.pw=$('rg-pw').value; v.pw2=$('rg-pw2').value;
   const digits=v.doc.replace(/\D/g,''), all=users(), uL=v.user.toLowerCase(); let n=0; const bad=(k,m)=>{rgBad(k,m);n++};
@@ -3071,7 +3075,7 @@ function doRegister(){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.email)) bad('email','Informe um e-mail válido (ex.: nome@empresa.com.br).');
   if(!/^[a-zA-Z0-9._-]{3,30}$/.test(v.user)) bad('user','Use de 3 a 30 caracteres: letras, números, ponto, hífen ou _ (sem espaços).');
   else if(uL==='admin') bad('user','Este usuário já está em uso. Escolha outro.');
-  if(v.pw.length<6) bad('pw','A senha precisa ter pelo menos 6 caracteres.');
+  if(v.pw.length<8) bad('pw','A senha precisa ter pelo menos 8 caracteres.');
   else if(!/[a-zA-Z]/.test(v.pw)||!/\d/.test(v.pw)) bad('pw','Use letras e números na senha.');
   if(!v.pw2) bad('pw2','Repita a senha para confirmar.'); else if(v.pw2!==v.pw) bad('pw2','As senhas não conferem.');
   if(n){ $('rerrt').textContent=n===1?'Corrija o campo destacado para continuar.':`Corrija os ${n} campos destacados para continuar.`; $('rerr').classList.add('on'); shakeBox();

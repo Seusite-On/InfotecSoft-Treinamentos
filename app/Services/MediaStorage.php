@@ -15,7 +15,7 @@ class MediaStorage
     {
         $err = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
         if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
-            return ['ok' => false, 'message' => 'O vídeo é maior que o limite do servidor (' . ini_get('upload_max_filesize') . '). Abra o portal pelo iniciar-servidor.bat.'];
+            return ['ok' => false, 'message' => 'O vídeo é maior que o limite do servidor (' . ini_get('upload_max_filesize') . ').'];
         }
         if ($err !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'] ?? '')) {
             return ['ok' => false, 'message' => 'Não foi possível receber o arquivo de vídeo. Tente novamente.'];
@@ -31,7 +31,7 @@ class MediaStorage
         if (!is_dir($this->videoDir())) mkdir($this->videoDir(), 0775, true);
         $name = $lessonId . '-' . bin2hex(random_bytes(6)) . '.' . $ext;
         if (!move_uploaded_file($file['tmp_name'], $this->videoDir() . '/' . $name)) {
-            return ['ok' => false, 'message' => 'Não foi possível salvar o vídeo no servidor (pasta storage/videos).'];
+            return ['ok' => false, 'message' => 'Não foi possível salvar o vídeo no servidor.'];
         }
         return ['ok' => true, 'path' => $name, 'name' => mb_substr(basename((string) $file['name']), 0, 255), 'size' => (int) $file['size'],
             'mime' => str_starts_with($mime, 'video/') ? $mime : self::VIDEO_EXT[$ext]];

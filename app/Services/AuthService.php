@@ -17,7 +17,10 @@ class AuthService
     public function attempt(string $login, string $password): array
     {
         $u = $this->users->findByLogin($login);
-        if (!$u || !password_verify($password, (string) $u['password'])) {
+        // Mesmo custo de tempo com ou sem usuário (evita descobrir logins válidos pelo tempo de resposta)
+        $hash = $u ? (string) $u['password'] : '$2y$10$usesomesillystringfore7hnbRJHxXVLeakoG8K30oukPsA.ztMG';
+        $okPw = password_verify($password, $hash);
+        if (!$u || !$okPw) {
             return ['ok' => false, 'status' => 401, 'code' => 'invalid', 'message' => 'Usuário ou senha incorretos. Tente novamente.'];
         }
         if ($u['status'] === 'pendente') {
@@ -31,6 +34,8 @@ class AuthService
         }
         $this->users->update((int) $u['user_id'], ['last_login_at' => now()]);
         Auth::login(['user_id' => (int) $u['user_id'], 'name' => $u['name'], 'username' => $u['username'], 'role' => $u['role'], 'status' => $u['status']]);
+        // Senha inicial/fraca: obriga a troca antes de usar o portal
+        $_SESSION['must_change'] = !password_is_strong($password);
         return ['ok' => true, 'status' => 200];
     }
 
@@ -48,16 +53,17 @@ class AuthService
         ];
         $e = [];
         if (count(array_filter(explode(' ', $v['nome']), fn($p) => mb_strlen($p) > 1)) < 2) $e['nome'] = 'Informe seu nome e sobrenome.';
+        if (mb_strlen($v['nome']) > 120) $e['nome'] = 'Nome muito longo.';
         if (mb_strlen($v['emp']) < 2) $e['emp'] = 'Informe o nome da empresa.';
+        elseif (mb_strlen($v['emp']) > 120) $e['emp'] = 'Nome da empresa muito longo.';
         if ($v['doc'] === '') $e['doc'] = 'Informe o CNPJ da empresa ou seu CPF.';
         elseif (!(strlen($v['doc']) === 11 ? valid_cpf($v['doc']) : (strlen($v['doc']) === 14 && valid_cnpj($v['doc'])))) $e['doc'] = 'CPF ou CNPJ inválido. Confira os números.';
         if (!$this->systems->exists($v['sys'])) $e['sys'] = 'Selecione o sistema que sua empresa utiliza.';
-        if (!filter_var($v['email'], FILTER_VALIDATE_EMAIL)) $e['email'] = 'Informe um e-mail válido (ex.: nome@empresa.com.br).';
+        if (!filter_var($v['email'], FILTER_VALIDATE_EMAIL) || mb_strlen($v['email']) > 150) $e['email'] = 'Informe um e-mail válido (ex.: nome@empresa.com.br).';
         elseif ($this->users->emailInUse($v['email'])) $e['email'] = 'Já existe uma solicitação com este e-mail.';
         if (!preg_match('/^[a-zA-Z0-9._-]{3,30}$/', $v['user'])) $e['user'] = 'Use de 3 a 30 caracteres: letras, números, ponto, hífen ou _ (sem espaços).';
         elseif (strtolower($v['user']) === 'admin' || $this->users->usernameTaken($v['user'])) $e['user'] = 'Este usuário já está em uso. Escolha outro.';
-        if (strlen($v['pw']) < 6) $e['pw'] = 'A senha precisa ter pelo menos 6 caracteres.';
-        elseif (!preg_match('/[a-zA-Z]/', $v['pw']) || !preg_match('/\d/', $v['pw'])) $e['pw'] = 'Use letras e números na senha.';
+        if (!password_is_strong($v['pw'])) $e['pw'] = password_rule_message();
         if ($e) {
             return ['ok' => false, 'errors' => $e];
         }

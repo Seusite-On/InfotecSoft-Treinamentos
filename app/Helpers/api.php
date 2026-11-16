@@ -33,6 +33,9 @@ if (!function_exists('require_login')) {
             \App\Core\Auth::logout();
             json_fail('Seu acesso não está mais ativo. Fale com o administrador.', 401);
         }
+        if ($permission !== null && !empty($_SESSION['must_change'])) {
+            json_fail('Troque sua senha em "Meu perfil" antes de continuar.', 403, ['code' => 'must_change']);
+        }
         if ($permission !== null && !\App\Core\Gate::allows($permission)) {
             json_fail('Você não tem permissão para esta ação.', 403);
         }

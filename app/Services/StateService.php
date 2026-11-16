@@ -44,7 +44,7 @@ class StateService
         $access = $isAdmin ? [] : ($this->users->accessMap($uid)[$uid] ?? []);
         $state['me'] = [
             'id' => (string) $uid, 'nome' => $me['name'], 'empresa' => $me['company_name'] ?? '', 'usuario' => $me['username'],
-            'admin' => $isAdmin, 'adm' => $isAdmin ? [] : $adm, 'perms' => $isAdmin ? null : (object) $access,
+            'admin' => $isAdmin, 'must_change' => !empty($_SESSION['must_change']), 'adm' => $isAdmin ? [] : $adm, 'perms' => $isAdmin ? null : (object) $access,
         ];
 
         $modules = $this->modules->all();

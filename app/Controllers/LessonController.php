@@ -13,7 +13,7 @@ class LessonController extends Controller
         require_login('videos');
         // Envio de arquivo grande acima do post_max_size chega com $_POST vazio
         if (empty($_POST) && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0 && !str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'json')) {
-            json_fail('O vídeo é maior que o limite do servidor (' . ini_get('post_max_size') . '). Abra o portal pelo iniciar-servidor.bat.', 413);
+            json_fail('O vídeo é maior que o limite do servidor (' . ini_get('post_max_size') . ').', 413);
         }
         $r = (new LessonService())->save((new Request())->all(), $_FILES['file'] ?? null);
         $r['ok'] ? json_out($r) : json_out($r, $r['status'] ?? 422);

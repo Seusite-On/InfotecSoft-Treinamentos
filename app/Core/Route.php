@@ -61,7 +61,7 @@ class Route
 
         $method = Request::method();
         $path = Request::path();
-        $routes = self::$routes[$method] ?? [];
+        $routes = self::$routes[$method === 'HEAD' ? 'GET' : $method] ?? [];
         foreach ($routes as [$regex, $action]) {
             if (preg_match($regex, $path, $matches)) {
                 $params = [];

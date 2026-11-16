@@ -52,14 +52,20 @@ if (PHP_SAPI === 'cli') {
 }
 
 // Security Headers (mesmo padrão do Stok Net + liberações do player do YouTube e dos vídeos)
+header_remove('X-Powered-By');
 header("X-Content-Type-Options: nosniff");
 header("X-Frame-Options: SAMEORIGIN");
 header("Referrer-Policy: strict-origin-when-cross-origin");
-header("Permissions-Policy: camera=(), microphone=(), geolocation=()");
-header("Content-Security-Policy: default-src 'self' https:; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; "
-    . "script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; "
-    . "font-src 'self' https: data:; connect-src 'self' https:; media-src 'self' blob:; "
-    . "frame-src https://www.youtube-nocookie.com https://www.youtube.com;");
+header("Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+header("Cross-Origin-Opener-Policy: same-origin");
+if (is_https()) {
+    header("Strict-Transport-Security: max-age=31536000; includeSubDomains");
+}
+header("Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; "
+    . "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    . "img-src 'self' data: blob: https://img.youtube.com https://i.ytimg.com; font-src 'self' data: https://fonts.gstatic.com; "
+    . "connect-src 'self'; media-src 'self' blob:; frame-src https://www.youtube-nocookie.com https://www.youtube.com"
+    . (is_https() ? "; upgrade-insecure-requests" : ""));
 
 // Erros não tratados viram JSON 500 nas rotas /api (e nunca expõem detalhes ao usuário)
 set_exception_handler(static function (\Throwable $e): void {
@@ -70,7 +76,7 @@ set_exception_handler(static function (\Throwable $e): void {
     }
     $msg = 'Erro interno no servidor.';
     if ($e instanceof \PDOException) {
-        $msg = 'Não foi possível acessar o banco de dados. Confira se o MySQL do Laragon está ligado e rode o atualizar-banco.bat.';
+        $msg = 'Serviço temporariamente indisponível. Tente novamente em instantes.';
     }
     echo json_encode(['ok' => false, 'message' => $msg], JSON_UNESCAPED_UNICODE);
 });
@@ -81,8 +87,8 @@ if (is_file($routesFile)) {
 }
 
 if (session_status() === PHP_SESSION_NONE) {
-    $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-    session_name('treinamentos_sid');
+    $isHttps = is_https();
+    session_name($isHttps ? '__Host-treinamentos_sid' : 'treinamentos_sid');
     session_set_cookie_params([
         'lifetime' => 0,
         'path' => '/',
@@ -92,6 +98,14 @@ if (session_status() === PHP_SESSION_NONE) {
         'samesite' => 'Lax',
     ]);
     ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
     ini_set('session.cookie_httponly', '1');
+    ini_set('session.gc_maxlifetime', '43200');
     session_start();
+    // Sessão expira após 12 h sem uso
+    if (isset($_SESSION['user'], $_SESSION['last_seen']) && time() - (int) $_SESSION['last_seen'] > 43200) {
+        \App\Core\Auth::logout();
+        session_start();
+    }
+    $_SESSION['last_seen'] = time();
 }
