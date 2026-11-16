@@ -1,5 +1,8 @@
 @echo off
 cd /d "%~dp0"
+set "GIT_CONFIG_COUNT=1"
+set "GIT_CONFIG_KEY_0=safe.directory"
+set "GIT_CONFIG_VALUE_0=C:/InfotecSoft-Treinamentos"
 title Conectar ao GitHub - InfotecSoft Treinamentos
 set "GIT="
 where git >nul 2>nul && set "GIT=git"
@@ -22,6 +25,8 @@ exit /b
 :main
 echo === %date% %time% ===
 "%GIT%" --version
+echo HOME=%HOME% USERPROFILE=%USERPROFILE%
+"%GIT%" config --global --list --show-origin
 "%GIT%" config --global --get-all safe.directory | findstr /i /c:"C:/InfotecSoft-Treinamentos" >nul || "%GIT%" config --global --add safe.directory C:/InfotecSoft-Treinamentos
 if not exist ".github\workflows" mkdir ".github\workflows"
 copy /y "deploy\deploy.yml" ".github\workflows\deploy.yml"
@@ -33,7 +38,7 @@ if not exist ".git" "%GIT%" init -b main
 "%GIT%" add -A
 "%GIT%" commit -m "Portal de treinamentos - versao inicial"
 "%GIT%" branch -M main
-"%GIT%" push -u origin main
+"%GIT%" -c credential.helper= -c credential.helper=manager push -u origin main
 echo PUSH_EXIT=%errorlevel%
 "%GIT%" status -sb
 "%GIT%" log --oneline -3

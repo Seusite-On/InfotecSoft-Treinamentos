@@ -1,5 +1,8 @@
 @echo off
 cd /d "%~dp0"
+set "GIT_CONFIG_COUNT=1"
+set "GIT_CONFIG_KEY_0=safe.directory"
+set "GIT_CONFIG_VALUE_0=C:/InfotecSoft-Treinamentos"
 title Enviar alteracoes para o GitHub
 set "GIT="
 where git >nul 2>nul && set "GIT=git"
@@ -16,7 +19,7 @@ set /p MSG=Descreva o que voce alterou (Enter = "Atualizacao do portal"):
 if not defined MSG set "MSG=Atualizacao do portal"
 "%GIT%" add -A
 "%GIT%" commit -m "%MSG%"
-"%GIT%" push
+"%GIT%" -c credential.helper= -c credential.helper=manager push
 echo.
 echo Enviado! Acompanhe a publicacao em: GitHub ^> seu repositorio ^> aba Actions
 pause
