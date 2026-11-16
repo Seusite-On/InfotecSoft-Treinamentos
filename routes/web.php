@@ -27,6 +27,11 @@ Route::post('/api/users/{id}/access', [UserController::class, 'access']);
 Route::post('/api/users/{id}/reset-password', [UserController::class, 'resetPassword']);
 Route::post('/api/users/{id}/profile', [UserController::class, 'profile']);
 
+// Sugestões de melhoria
+Route::post('/api/suggestions', [App\Controllers\SuggestionController::class, 'store']);
+Route::post('/api/suggestions/{id}/status', [App\Controllers\SuggestionController::class, 'status']);
+Route::post('/api/suggestions/{id}/delete', [App\Controllers\SuggestionController::class, 'destroy']);
+
 // Empresa pelo CNPJ (tela de cadastro)
 Route::get('/api/companies/{cnpj}', [App\Controllers\CompanyController::class, 'lookup']);
 

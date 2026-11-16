@@ -32,6 +32,7 @@ class AuthController extends Controller
 
         foreach ([[$rateKey, 5], [$ipKey, 20], [$userKey, 10]] as [$k, $max]) {
             if ($this->rateLimiter->tooManyAttempts($k, $max, 900)) {
+                \App\Services\AccessLog::record('bloqueado', null, $username);
                 header('Retry-After: ' . $this->rateLimiter->availableIn($k));
                 json_fail('Muitas tentativas. Aguarde alguns minutos e tente novamente.', 429, ['code' => 'locked']);
             }
@@ -44,6 +45,7 @@ class AuthController extends Controller
         }
         $r = $this->auth->attempt($username, $password);
         if (!$r['ok']) {
+            \App\Services\AccessLog::record($r['code'] === 'invalid' ? 'senha_errada' : 'recusado', null, $username);
             if ($r['code'] === 'invalid') {
                 $this->rateLimiter->hit($rateKey, 900);
                 $this->rateLimiter->hit($ipKey, 900);
@@ -52,11 +54,13 @@ class AuthController extends Controller
             json_fail($r['message'], $r['status'], ['code' => $r['code']]);
         }
         $this->rateLimiter->reset($rateKey);
+        \App\Services\AccessLog::record('entrou', \App\Core\Auth::id(), $username);
         json_out(['ok' => true, 'must_change' => !empty($_SESSION['must_change'])]);
     }
 
     public function logout(): void
     {
+        if (Auth::check()) \App\Services\AccessLog::record('saiu', Auth::id(), Auth::user()['username'] ?? null);
         Auth::logout();
         json_out(['ok' => true]);
     }

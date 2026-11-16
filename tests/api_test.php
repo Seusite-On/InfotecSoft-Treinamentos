@@ -313,6 +313,32 @@ $st = $adm->state(); $still = array_filter($st['lessons'], fn($l) => (int) $l['i
 check('Admin exclui a aula inteira', $c === 200 && !$still, "HTTP $c");
 $adm->req('POST', "/api/lessons/$lb/delete");
 
+// painel de últimos acessos
+$st = $adm->state(); $acc = $st['access'] ?? null;
+check('Admin recebe a lista de últimos acessos', is_array($acc) && count($acc) > 0);
+check('Login com sucesso registrado (entrou)', is_array($acc) && (bool) array_filter($acc, fn($x) => $x['ev'] === 'entrou' && (int) $x['uid'] === $aluId && $x['nome'] === 'Aluno Editado'));
+check('Senha errada registrada', is_array($acc) && (bool) array_filter($acc, fn($x) => $x['ev'] === 'senha_errada'));
+check('Bloqueio por excesso registrado', is_array($acc) && (bool) array_filter($acc, fn($x) => $x['ev'] === 'bloqueado'));
+$st = $alu3->state();
+check('Aluno não recebe a lista de acessos', !isset($st['access']));
+
+// sugestões de melhoria
+[$c, $j] = $alu3->req('POST', '/api/suggestions', ['category' => 'conteudo', 'message' => 'curta']);
+check('Sugestão muito curta recusada', $c === 422, "HTTP $c");
+[$c, $j] = $alu3->req('POST', '/api/suggestions', ['category' => 'conteudo', 'message' => '<b>Aula</b> sobre MDF-e no Fusion Web, por favor ' . $uniq]);
+$sgId = $j['id'] ?? '';
+check('Aluno envia sugestão', $c === 201 && $sgId !== '', "HTTP $c");
+$st = $adm->state(); $sg = null; foreach ($st['suggestions'] ?? [] as $x) if ($x['id'] === $sgId) $sg = $x;
+check('Admin vê a sugestão com o nome de quem enviou', $sg && $sg['status'] === 'nova' && $sg['nome'] === 'Aluno Editado');
+[$c] = $alu3->req('POST', "/api/suggestions/$sgId/status", ['status' => 'feita']);
+check('Aluno não muda o status de sugestões (403)', $c === 403, "HTTP $c");
+[$c] = $adm->req('POST', "/api/suggestions/$sgId/status", ['status' => 'feita', 'note' => 'Aula publicada!']);
+$st = $alu3->state(); $mySg = array_values(array_filter($st['suggestions'] ?? [], fn($x) => $x['id'] === $sgId));
+check('Aluno vê a resposta e o status "feita"', $c === 200 && $mySg && $mySg[0]['status'] === 'feita' && $mySg[0]['note'] === 'Aula publicada!', "HTTP $c");
+check('Aluno só vê as próprias sugestões', count(array_filter($st['suggestions'] ?? [], fn($x) => !$x['mine'])) === 0);
+[$c] = $adm->req('POST', "/api/suggestions/$sgId/delete");
+check('Admin exclui a sugestão', $c === 200, "HTTP $c");
+
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";
 foreach ($mine as $l) { $adm->req('POST', '/api/lessons/' . $l['id'] . '/remove-video'); }

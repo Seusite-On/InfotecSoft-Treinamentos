@@ -104,6 +104,23 @@ class StateService
         } else {
             $state['users'] = [];
         }
+        // Últimos acessos (equipe com permissão de usuários)
+        if (Gate::allows('usuarios')) {
+            $state['access'] = array_map(fn($r) => [
+                'id' => (string) $r['log_id'], 'ev' => $r['event'], 'nome' => $r['name'] ?? '', 'usuario' => $r['username'] ?? '', 'empresa' => $r['company_name'] ?? '',
+                'ip' => $r['ip'] ?? '', 'ua' => $r['user_agent'] ?? '', 'em' => ms($r['created_at']), 'uid' => $r['user_id'] ? (string) $r['user_id'] : '',
+            ], \App\Core\DB::select('SELECT a.*, u.name, u.company_name FROM access_logs a LEFT JOIN users u ON u.user_id = a.user_id ORDER BY a.log_id DESC LIMIT 300'));
+        }
+        // Sugestões: a equipe vê todas, cada usuário vê as próprias
+        $isTeam = Gate::allows('usuarios');
+        $rows = $isTeam
+            ? \App\Core\DB::select('SELECT s.*, u.name, u.company_name FROM suggestions s JOIN users u ON u.user_id = s.user_id ORDER BY s.created_at DESC LIMIT 300')
+            : \App\Core\DB::select('SELECT s.*, NULL AS name, NULL AS company_name FROM suggestions s WHERE s.user_id = ? ORDER BY s.created_at DESC LIMIT 50', [$uid]);
+        $state['suggestions'] = array_map(fn($r) => [
+            'id' => (string) $r['suggestion_id'], 'cat' => $r['category'], 'msg' => $r['message'], 'status' => $r['status'], 'note' => $r['admin_note'] ?? '',
+            'nome' => $r['name'] ?? '', 'empresa' => $r['company_name'] ?? '', 'mine' => (int) $r['user_id'] === $uid,
+            'criado' => ms($r['created_at']), 'atualizado' => ms($r['updated_at']),
+        ], $rows);
         return $state;
     }
 }

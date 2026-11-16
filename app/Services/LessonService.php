@@ -71,7 +71,9 @@ class LessonService
             if ($dur !== '') $data['duration'] = $dur;
         }
 
+        $created = false;
         if (!$target) {
+            $created = true;
             $data += ['position' => $this->lessons->nextPosition($moduleId), 'origin' => 'admin', 'created_by' => Auth::id(), 'created_at' => $now];
             $id = $this->lessons->create($data + ['title' => $data['title'] ?? 'Aula']);
             $target = $this->lessons->find($id);
@@ -86,7 +88,7 @@ class LessonService
         } elseif ($hasUpload) {
             $st = $this->storage->storeVideo($upload, $id);
             if (!$st['ok']) {
-                if ($old['created_at'] === $now && $old['origin'] === 'admin' && $old['video_source'] === 'none') $this->lessons->delete($id);
+                if ($created) $this->lessons->delete($id); // aula criada agora só para este envio que falhou
                 return ['ok' => false, 'status' => 422, 'errors' => ['vf-fi' => $st['message']], 'message' => $st['message']];
             }
             $thumb = $this->storage->storeThumb((string) ($in['thumb'] ?? ''), $id);
