@@ -65,7 +65,7 @@ check('Página não mostra usuário/senha de teste', !str_contains($body, 'Admin
 foreach (['x-content-type-options', 'x-frame-options', 'referrer-policy', 'content-security-policy', 'permissions-policy'] as $k) {
     check("Cabeçalho $k presente", isset($h[$k]));
 }
-check('CSP sem curinga https: em scripts', isset($h['content-security-policy']) && !preg_match("/script-src[^;]*https:/", $h['content-security-policy'][0]));
+check('CSP sem curinga https: em scripts', isset($h['content-security-policy']) && !preg_match("/script-src[^;]*\\shttps:(\\s|;|$)/", $h['content-security-policy'][0]));
 check('Não expõe X-Powered-By', !isset($h['x-powered-by']));
 $cookie = implode(' ', $h['set-cookie'] ?? []);
 check('Cookie de sessão HttpOnly + SameSite', str_contains($cookie, 'HttpOnly') && stripos($cookie, 'SameSite=Lax') !== false, $cookie);

@@ -29,6 +29,15 @@ class AuthService
         if ($u['status'] !== 'aprovado') {
             return ['ok' => false, 'status' => 403, 'code' => 'rejected', 'message' => 'Seu cadastro não foi aprovado. Fale com o suporte.'];
         }
+        // Senha padrão do administrador (123) só funciona no PC local. Na internet ela é recusada.
+        $local = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true) && in_array(strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]), ['localhost', '127.0.0.1'], true);
+        if ($u['role'] === 'admin' && hash_equals('123', $password) && !$local) {
+            return ['ok' => false, 'status' => 403, 'code' => 'admin_default', 'message' => 'Por segurança, a senha padrão do administrador foi bloqueada. Defina uma nova senha pelo arquivo definir-senha-admin.bat no seu PC.'];
+        }
+        // Senha temporária de reset vale 48 h
+        if (!empty($u['must_change_password']) && !empty($u['password_reset_at']) && strtotime((string) $u['password_reset_at']) < time() - 48 * 3600) {
+            return ['ok' => false, 'status' => 403, 'code' => 'reset_expired', 'message' => 'Sua senha temporária expirou. Peça ao administrador um novo reset de senha.'];
+        }
         if (password_needs_rehash((string) $u['password'], PASSWORD_DEFAULT)) {
             $this->users->update((int) $u['user_id'], ['password' => password_hash($password, PASSWORD_DEFAULT)]);
         }

@@ -9,3 +9,5 @@
 # chave privada do deploy (nunca enviar)
 /deploy/CHAVE-*
 *.pem
+# dados do servidor (ficam so no PC)
+/deploy/servidor.local.json

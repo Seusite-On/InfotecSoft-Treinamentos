@@ -53,7 +53,7 @@ class UserService
         $u = $this->users->find($id);
         if (!$u) return ['ok' => false, 'status' => 404, 'message' => 'Usuário não encontrado.'];
         if ($err = $this->canManage($u)) return $err;
-        $this->users->update($id, ['password' => password_hash(self::RESET_PASSWORD, PASSWORD_DEFAULT), 'must_change_password' => 1, 'updated_at' => now()]);
+        $this->users->update($id, ['password' => password_hash(self::RESET_PASSWORD, PASSWORD_DEFAULT), 'must_change_password' => 1, 'password_reset_at' => now(), 'updated_at' => now()]);
         return ['ok' => true, 'password' => self::RESET_PASSWORD];
     }
 

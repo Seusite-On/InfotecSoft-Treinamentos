@@ -28,8 +28,9 @@ class AuthController extends Controller
         $password = raw_input('password');
         $rateKey = 'login:' . hash('sha256', strtolower($username ?: 'guest') . '|' . $this->request->clientIp());
         $ipKey = 'login-ip:' . hash('sha256', $this->request->clientIp());
+        $userKey = 'login-user:' . hash('sha256', strtolower($username ?: 'guest')); // mesmo usuário vindo de vários IPs
 
-        foreach ([[$rateKey, 5], [$ipKey, 20]] as [$k, $max]) {
+        foreach ([[$rateKey, 5], [$ipKey, 20], [$userKey, 10]] as [$k, $max]) {
             if ($this->rateLimiter->tooManyAttempts($k, $max, 900)) {
                 header('Retry-After: ' . $this->rateLimiter->availableIn($k));
                 json_fail('Muitas tentativas. Aguarde alguns minutos e tente novamente.', 429, ['code' => 'locked']);
@@ -46,6 +47,7 @@ class AuthController extends Controller
             if ($r['code'] === 'invalid') {
                 $this->rateLimiter->hit($rateKey, 900);
                 $this->rateLimiter->hit($ipKey, 900);
+                $this->rateLimiter->hit($userKey, 900);
             }
             json_fail($r['message'], $r['status'], ['code' => $r['code']]);
         }
@@ -62,6 +64,11 @@ class AuthController extends Controller
     public function register(): void
     {
         $key = 'register:' . hash('sha256', $this->request->clientIp());
+        $tryKey = 'register-try:' . hash('sha256', $this->request->clientIp());
+        if ($this->rateLimiter->tooManyAttempts($tryKey, 20, 3600)) {
+            json_fail('Muitas tentativas de cadastro. Tente novamente mais tarde.', 429, ['code' => 'locked']);
+        }
+        $this->rateLimiter->hit($tryKey, 3600);
         if ($this->rateLimiter->tooManyAttempts($key, 5, 3600)) {
             json_fail('Muitos cadastros feitos a partir desta rede. Tente novamente mais tarde.', 429, ['code' => 'locked']);
         }

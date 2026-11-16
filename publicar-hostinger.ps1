@@ -1,9 +1,13 @@
 # Publica o portal em https://zenim.me direto deste PC (sem GitHub Actions).
 $ErrorActionPreference = 'Continue'
 $Root    = Split-Path -Parent $MyInvocation.MyCommand.Path
-$SshHost = '149.62.37.243'; $Port = 65002; $User = 'u846229461'
-$AppDir  = 'domains/zenim.me'; $Site = 'https://zenim.me'
-$DbName  = 'u846229461_treinamentos'; $DbUser = 'u846229461_treinamentos'
+# Dados do servidor ficam so no seu PC (deploy\servidor.local.json, fora do GitHub)
+$CfgFile = Join-Path $Root 'deploy\servidor.local.json'
+if (-not (Test-Path $CfgFile)) { Write-Host "[ERRO] Arquivo deploy\servidor.local.json nao encontrado." -ForegroundColor Red; exit 1 }
+$Cfg = Get-Content $CfgFile -Raw | ConvertFrom-Json
+$SshHost = $Cfg.host; $Port = [int]$Cfg.port; $User = $Cfg.user
+$AppDir  = $Cfg.app_dir; $Site = $Cfg.site
+$DbName  = $Cfg.db_name; $DbUser = $Cfg.db_user
 $OutputEncoding = New-Object System.Text.UTF8Encoding $false
 
 $Log = Join-Path $Root 'storage\publicar_log.txt'
