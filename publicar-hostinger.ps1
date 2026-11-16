@@ -30,7 +30,8 @@ if (Test-Path $KeyTxt) {
   [IO.File]::WriteAllText($Key, ($m.Value -replace "`r", '') + "`n")
   icacls $Key /inheritance:r /grant:r "$($env:USERNAME):(R,W)" | Out-Null
 } elseif (-not (Test-Path $Key)) { Falha 'Chave nao encontrada (deploy\CHAVE-PRIVADA-GITHUB.txt).' }
-$SshArgs = @('-i', $Key, '-p', "$Port", '-o', 'StrictHostKeyChecking=accept-new', '-o', 'BatchMode=yes', "$User@$SshHost")
+$SshOpts = @('-i', $Key, '-o', 'StrictHostKeyChecking=accept-new', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', '-o', 'ServerAliveInterval=10', '-o', 'ServerAliveCountMax=3')
+$SshArgs = $SshOpts + @('-p', "$Port", "$User@$SshHost")
 function Remoto($cmd) { N ssh.exe ($SshArgs + $cmd); if ($script:rc -ne 0) { Falha "Comando no servidor falhou: $cmd" } }
 
 Etapa 'Testando conexao com a Hostinger'
@@ -47,8 +48,15 @@ $t = "Pacote: {0:N1} MB" -f ((Get-Item $Tgz).Length / 1MB); Write-Host $t; L $t
 
 # 3) Envia e extrai
 Etapa 'Enviando para a Hostinger'
-N scp.exe @('-i', $Key, '-P', "$Port", '-o', 'StrictHostKeyChecking=accept-new', '-o', 'BatchMode=yes', $Tgz, "${User}@${SshHost}:zenim-site.tgz")
-if ($script:rc -ne 0) { Falha 'Erro ao enviar o pacote.' }
+# envia o pacote pela entrada do ssh (mais estavel que o scp nesta hospedagem); ate 3 tentativas
+$ok = $false
+for ($t = 1; $t -le 3 -and -not $ok; $t++) {
+  if ($t -gt 1) { Write-Host "Tentando de novo ($t/3)..."; L "retry $t" }
+  $line = 'ssh.exe ' + (($SshArgs | ForEach-Object { '"' + $_ + '"' }) -join ' ') + ' "cat > zenim-site.tgz" < "' + $Tgz + '"'
+  cmd.exe /c $line 2>&1 | ForEach-Object { $l = "$_"; Write-Host $l; L $l }
+  if ($LASTEXITCODE -eq 0) { $ok = $true }
+}
+if (-not $ok) { Falha 'Erro ao enviar o pacote.' }
 Remoto "mkdir -p $AppDir && tar xzf zenim-site.tgz -C $AppDir && rm -f zenim-site.tgz"
 
 # 4) .env do servidor (so pede a senha do banco na primeira vez)
