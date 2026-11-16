@@ -34,8 +34,6 @@ $SshOpts = @('-i', $Key, '-o', 'StrictHostKeyChecking=accept-new', '-o', 'BatchM
 $SshArgs = $SshOpts + @('-p', "$Port", "$User@$SshHost")
 function Remoto($cmd) { N ssh.exe ($SshArgs + $cmd); if ($script:rc -ne 0) { Falha "Comando no servidor falhou: $cmd" } }
 
-Etapa 'Testando conexao com a Hostinger'
-Remoto 'echo conectado em $(hostname)'
 
 # 2) Empacota o projeto
 Etapa 'Empacotando arquivos'
@@ -48,20 +46,24 @@ $t = "Pacote: {0:N1} MB" -f ((Get-Item $Tgz).Length / 1MB); Write-Host $t; L $t
 
 # 3) Envia e extrai
 Etapa 'Enviando para a Hostinger'
-# envia o pacote pela entrada do ssh (mais estavel que o scp nesta hospedagem); ate 3 tentativas
-$ok = $false
+# Envia o pacote pela entrada do ssh e ja extrai, numa unica conexao (com limite de tempo e ate 3 tentativas)
+$Out = Join-Path $env:TEMP 'zenim-ssh-out.txt'; $Err = Join-Path $env:TEMP 'zenim-ssh-err.txt'
+$remote = "mkdir -p $AppDir && cat > zenim-site.tgz && tar xzf zenim-site.tgz -C $AppDir && rm -f zenim-site.tgz && echo ENVIO_OK && (test -f $AppDir/.env && echo ENV_OK || echo ENV_FALTA)"
+$ok = $false; $envOk = $false
 for ($t = 1; $t -le 3 -and -not $ok; $t++) {
-  if ($t -gt 1) { Write-Host "Tentando de novo ($t/3)..."; L "retry $t" }
-  $line = 'ssh.exe ' + (($SshArgs | ForEach-Object { '"' + $_ + '"' }) -join ' ') + ' "cat > zenim-site.tgz" < "' + $Tgz + '"'
-  cmd.exe /c $line 2>&1 | ForEach-Object { $l = "$_"; Write-Host $l; L $l }
-  if ($LASTEXITCODE -eq 0) { $ok = $true }
+  if ($t -gt 1) { Write-Host "Conexao lenta, tentando de novo ($t/3)..." -ForegroundColor Yellow; L "retry $t"; Start-Sleep 5 }
+  $argLine = (($SshArgs | ForEach-Object { '"' + $_ + '"' }) -join ' ') + ' "' + $remote + '"'
+  $p = Start-Process -FilePath 'ssh.exe' -ArgumentList $argLine -RedirectStandardInput $Tgz -RedirectStandardOutput $Out -RedirectStandardError $Err -NoNewWindow -PassThru
+  if (-not $p.WaitForExit(120000)) { try { $p.Kill() } catch {} ; L 'tempo esgotado no envio'; continue }
+  $o = (Get-Content $Out -Raw -ErrorAction SilentlyContinue) + (Get-Content $Err -Raw -ErrorAction SilentlyContinue)
+  if ($o) { L $o }
+  if ($o -match 'ENVIO_OK') { $ok = $true; $envOk = $o -match 'ENV_OK' } else { Write-Host $o }
 }
-if (-not $ok) { Falha 'Erro ao enviar o pacote.' }
-Remoto "mkdir -p $AppDir && tar xzf zenim-site.tgz -C $AppDir && rm -f zenim-site.tgz"
+if (-not $ok) { Falha 'Nao foi possivel enviar para a Hostinger (conexao). Tente de novo em alguns minutos.' }
+Write-Host 'Arquivos enviados.'
 
 # 4) .env do servidor (so pede a senha do banco na primeira vez)
-& ssh.exe @SshArgs "test -f $AppDir/.env"
-if ($LASTEXITCODE -ne 0) {
+if (-not $envOk) {
   L '.env ausente no servidor: pedindo senha do banco'
   Etapa 'Configurando o banco do servidor (primeira vez)'
   $sec = Read-Host "Digite a senha do banco $DbName (nao aparece na tela)" -AsSecureString
