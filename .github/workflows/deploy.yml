@@ -1,11 +1,11 @@
-# Publica o portal na VPS da Hostinger a cada "git push" na branch main.
-# Configure uma vez em GitHub > Settings > Secrets and variables > Actions:
-#   VPS_HOST     IP da VPS (hPanel > VPS > Visão geral)
-#   VPS_USER     deploy            (usuário criado pelo deploy/setup-vps.sh)
-#   VPS_PORT     22
-#   VPS_SSH_KEY  chave privada mostrada no final do setup-vps.sh
-#   APP_DIR      /var/www/treinamentos
-name: Publicar na VPS (Hostinger)
+# Publica o portal em zenim.me (hospedagem de sites da Hostinger) a cada "git push" na branch main.
+# Secrets necessários (GitHub > Settings > Secrets and variables > Actions):
+#   SSH_HOST     149.62.37.243          SSH_PORT  65002          SSH_USER  u846229461
+#   SSH_KEY      chave privada (arquivo deploy\CHAVE-PRIVADA-GITHUB.txt do seu PC)
+#   DB_NAME      u846229461_treinamentos
+#   DB_USER      u846229461_treinamentos
+#   DB_PASSWORD  senha criada no hPanel > Bancos de dados
+name: Publicar em zenim.me (Hostinger)
 
 on:
   push:
@@ -16,43 +16,68 @@ concurrency:
   group: deploy-producao
   cancel-in-progress: false
 
+env:
+  SITE_URL: https://zenim.me
+  APP_DIR: domains/zenim.me        # relativo à pasta do usuário na Hostinger; public_html fica aqui dentro
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      HOST: ${{ secrets.VPS_HOST }}
-      USER: ${{ secrets.VPS_USER }}
-      PORT: ${{ secrets.VPS_PORT || '22' }}
-      DIR: ${{ secrets.APP_DIR || '/var/www/treinamentos' }}
+      HOST: ${{ secrets.SSH_HOST }}
+      PORT: ${{ secrets.SSH_PORT }}
+      USER: ${{ secrets.SSH_USER }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Conferir sintaxe do PHP
-        run: |
-          find . -name "*.php" -not -path "./vendor/*" -print0 | xargs -0 -n1 php -l > /dev/null
-          echo "PHP sem erros de sintaxe."
+        run: find . -name "*.php" -not -path "./vendor/*" -print0 | xargs -0 -n1 php -l > /dev/null && echo "PHP OK"
 
       - name: Preparar acesso SSH
         run: |
-          test -n "$HOST" || { echo "::error::Secret VPS_HOST não configurado"; exit 1; }
+          test -n "$HOST" || { echo "::error::Secret SSH_HOST não configurado"; exit 1; }
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH=ssh -i $HOME/.ssh/deploy_key -p $PORT -o BatchMode=yes $USER@$HOST" >> "$GITHUB_ENV"
 
-      - name: Enviar arquivos para a VPS
+      - name: Empacotar arquivos
         run: |
-          rsync -az --delete \
-            --exclude '.git/' --exclude '.github/' --exclude 'frontend/' --exclude 'deploy/' \
-            --exclude '.env' --exclude 'vendor/' \
-            --exclude 'storage/videos/' --exclude 'storage/thumbs/' --exclude 'storage/security/' --exclude 'storage/*.txt' \
-            --exclude '/*.bat' --exclude '/*.ps1' --exclude '/index.html' --exclude '/LEIA-ME.txt' \
-            -e "ssh -i ~/.ssh/deploy_key -p $PORT" ./ "$USER@$HOST:$DIR/"
+          tar czf /tmp/site.tgz \
+            --exclude=./.git --exclude=./.github --exclude=./frontend --exclude=./deploy \
+            --exclude=./.env --exclude=./vendor \
+            --exclude=./storage/videos --exclude=./storage/thumbs --exclude=./storage/security --exclude='./storage/*.txt' \
+            --exclude='./*.bat' --exclude='./*.ps1' --exclude=./index.html --exclude=./LEIA-ME.txt \
+            .
+          ls -lh /tmp/site.tgz
 
-      - name: Atualizar banco de dados e testar
+      - name: Enviar para a Hostinger
         run: |
-          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" "cd '$DIR' && php database/scripts/run_all.php && php tests/smoke.php"
+          $SSH "mkdir -p $APP_DIR"
+          $SSH "tar xzf - -C $APP_DIR" < /tmp/site.tgz
 
-      - name: Conferir se o site responde
+      - name: Gravar .env do servidor
+        env:
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" "curl -s -o /dev/null -w 'HTTP %{http_code}\n' -H 'Host: localhost' http://127.0.0.1/api/state || true"
+          test -n "$DB_NAME" || { echo "::error::Secrets DB_NAME/DB_USER/DB_PASSWORD não configurados"; exit 1; }
+          printf 'DB_HOST=localhost\nDB_PORT=3306\nDB_USERNAME=%s\nDB_PASSWORD=%s\nDB_DATABASE=%s\nUPLOAD_MAX_MB=2048\n' "$DB_USER" "$DB_PASSWORD" "$DB_NAME" \
+            | $SSH "cat > $APP_DIR/.env && chmod 600 $APP_DIR/.env"
+
+      - name: Atualizar banco e testar
+        run: |
+          $SSH 'cd '"$APP_DIR"' && mkdir -p storage/videos storage/thumbs storage/security \
+            && rm -f public_html/default.php \
+            && PHP=$( [ -x /opt/alt/php83/usr/bin/php ] && echo /opt/alt/php83/usr/bin/php || command -v php ) \
+            && echo "PHP: $($PHP -r "echo PHP_VERSION;")" \
+            && $PHP database/scripts/migrate.php && $PHP database/scripts/seed.php && $PHP tests/smoke.php'
+
+      - name: Conferir o site no ar
+        run: |
+          sleep 3
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE_URL/api/state")
+          echo "GET $SITE_URL/api/state -> HTTP $code"
+          test "$code" = "200"

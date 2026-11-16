@@ -6,3 +6,6 @@
 /storage/*.txt
 !/storage/videos/.gitkeep
 !/storage/thumbs/.gitkeep
+# chave privada do deploy (nunca enviar)
+/deploy/CHAVE-*
+*.pem

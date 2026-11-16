@@ -12,6 +12,8 @@ if not defined GIT (
   pause
   exit /b 1
 )
+if not exist ".github\workflows" mkdir ".github\workflows"
+copy /y "deploy\deploy.yml" ".github\workflows\deploy.yml" >nul
 "%GIT%" status --short
 echo.
 set "MSG="
