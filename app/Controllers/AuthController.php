@@ -91,7 +91,7 @@ class AuthController extends Controller
         }
         if (!password_is_strong($new)) json_fail(password_rule_message(), 422, ['field' => 'new']);
         if (hash_equals($current, $new)) json_fail('A nova senha precisa ser diferente da atual.', 422, ['field' => 'new']);
-        $repo->update((int) $u['user_id'], ['password' => password_hash($new, PASSWORD_DEFAULT), 'updated_at' => now()]);
+        $repo->update((int) $u['user_id'], ['password' => password_hash($new, PASSWORD_DEFAULT), 'must_change_password' => 0, 'updated_at' => now()]);
         $this->rateLimiter->reset($key);
         $_SESSION['must_change'] = false;
         session_regenerate_id(true);

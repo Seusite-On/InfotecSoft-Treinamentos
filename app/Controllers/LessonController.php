@@ -19,6 +19,20 @@ class LessonController extends Controller
         $r['ok'] ? json_out($r) : json_out($r, $r['status'] ?? 422);
     }
 
+    public function destroy(string $id): void
+    {
+        require_login('videos');
+        $r = (new LessonService())->deleteLesson((int) $id);
+        $r['ok'] ? json_out($r) : json_fail($r['message'], $r['status']);
+    }
+
+    public function move(string $id): void
+    {
+        require_login('videos');
+        $r = (new LessonService())->moveLesson((int) $id, (new Request())->int('dir'));
+        $r['ok'] ? json_out($r) : json_fail($r['message'], $r['status']);
+    }
+
     public function removeVideo(string $id): void
     {
         require_login('videos');

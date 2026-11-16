@@ -24,6 +24,11 @@ Route::post('/api/password', [AuthController::class, 'changePassword']);
 // Usuários: aprovação e permissões
 Route::post('/api/users/{id}/status', [UserController::class, 'status']);
 Route::post('/api/users/{id}/access', [UserController::class, 'access']);
+Route::post('/api/users/{id}/reset-password', [UserController::class, 'resetPassword']);
+Route::post('/api/users/{id}/profile', [UserController::class, 'profile']);
+
+// Empresa pelo CNPJ (tela de cadastro)
+Route::get('/api/companies/{cnpj}', [App\Controllers\CompanyController::class, 'lookup']);
 
 // Módulos
 Route::post('/api/modules', [ModuleController::class, 'store']);
@@ -34,6 +39,8 @@ Route::post('/api/modules/{id}/delete', [ModuleController::class, 'destroy']);
 // Aulas / vídeos (YouTube ou arquivo enviado)
 Route::post('/api/lessons', [LessonController::class, 'save']);
 Route::post('/api/lessons/{id}/remove-video', [LessonController::class, 'removeVideo']);
+Route::post('/api/lessons/{id}/delete', [LessonController::class, 'destroy']);
+Route::post('/api/lessons/{id}/move', [LessonController::class, 'move']);
 
 // Arquivos de vídeo e miniaturas (com checagem de permissão)
 Route::get('/media/video/{id}', [MediaController::class, 'video']);

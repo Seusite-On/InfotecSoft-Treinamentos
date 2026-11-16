@@ -195,17 +195,24 @@ $alu = new Client($BASE);
 $alu->state();
 $cpf = function (): string { $n = []; for ($i = 0; $i < 9; $i++) $n[] = random_int(0, 9);
     for ($t = 9; $t < 11; $t++) { $s = 0; for ($i = 0; $i < $t; $i++) $s += $n[$i] * ($t + 1 - $i); $n[] = (($s * 10) % 11) % 10; } return implode('', $n); };
-$base = ['nome' => 'Aluno Teste', 'emp' => 'Empresa Teste', 'doc' => $cpf(), 'sys' => 'fusion-web', 'email' => "aluno$uniq@teste.com", 'user' => "aluno$uniq"];
+$base = ['nome' => 'Aluno Teste', 'emp' => 'Ignorado', 'doc' => '10340101000165', 'sys' => 'fusion-web', 'email' => "aluno$uniq@teste.com", 'user' => "aluno$uniq"];
 [$c, $j] = $alu->req('POST', '/api/register', $base + ['pw' => 'abc123']);
 check('Cadastro com senha de 6 caracteres recusado (mín. 8)', $c === 422 && isset($j['errors']['pw']), "HTTP $c");
 [$c, $j] = $alu->req('POST', '/api/register', array_merge($base, ['user' => 'admin', 'pw' => 'Senha' . $uniq . '1']));
 check('Não deixa cadastrar o usuário "admin"', $c === 422 && isset($j['errors']['user']), "HTTP $c");
-[$c, $j] = $alu->req('POST', '/api/register', array_merge($base, ['doc' => '11111111111', 'pw' => 'Senha' . $uniq . '1']));
-check('CPF inválido recusado', $c === 422 && isset($j['errors']['doc']), "HTTP $c");
+[$c, $j] = $alu->req('POST', '/api/register', array_merge($base, ['doc' => '11111111111111', 'pw' => 'Senha' . $uniq . '1']));
+check('CNPJ inválido recusado', $c === 422 && isset($j['errors']['doc']), "HTTP $c");
+[$c, $j] = $alu->req('POST', '/api/register', array_merge($base, ['doc' => '11222333000181', 'pw' => 'Senha' . $uniq . '1']));
+check('CNPJ de empresa não cadastrada no portal recusado', $c === 422 && str_contains($j['errors']['doc'] ?? '', 'não encontrada'), "HTTP $c");
+[$c, $j] = $alu->req('GET', '/api/companies/10340101000165');
+check('Consulta de CNPJ identifica a InfotecSoft', $c === 200 && ($j['name'] ?? '') === 'InfotecSoft', "HTTP $c");
+[$c] = $alu->req('GET', '/api/companies/11222333000181');
+check('Consulta de CNPJ não cadastrado -> 404', $c === 404, "HTTP $c");
 $ALU_PW = 'Senha ' . $uniq . '1';   // com espaço: senha não pode ser "aparada"
 [$c, $j] = $alu->req('POST', '/api/register', array_merge($base, ['nome' => '<script>alert(1)</script> Silva', 'pw' => $ALU_PW]));
 $aluId = (int) ($j['user']['id'] ?? 0);
 check('Cadastro válido -> 201 (pendente)', $c === 201 && $aluId > 0, "HTTP $c " . ($j['message'] ?? ''));
+check('Empresa do cadastro vem do CNPJ (InfotecSoft)', ($j['user']['empresa'] ?? '') === 'InfotecSoft', $j['user']['empresa'] ?? '');
 [$c, $j] = $alu->login("aluno$uniq", $ALU_PW);
 check('Aluno pendente não entra (403)', $c === 403 && ($j['code'] ?? '') === 'pending', "HTTP $c");
 [$c] = $adm->req('POST', "/api/users/$aluId/status", ['status' => 'aprovado']);
@@ -261,6 +268,51 @@ if ($fileLesson) {
 [$c] = $adm->req('POST', '/api/users/1/status', ['status' => 'recusado']);
 check('Ninguém bloqueia o administrador principal', $c >= 400, "HTTP $c");
 
+/* ---------------- 9b. Reset de senha, edição de cadastro e aulas ---------------- */
+echo "\n9b) Reset de senha, edição de cadastro e gestão de aulas\n";
+[$c] = $adm->req('POST', "/api/users/$aluId/status", ['status' => 'aprovado']);
+check('Admin reaprova o aluno', $c === 200, "HTTP $c");
+[$c, $j] = $adm->req('POST', "/api/users/$aluId/reset-password");
+check('Admin reseta a senha para 12345678', $c === 200 && ($j['password'] ?? '') === '12345678', "HTTP $c");
+$alu2 = new Client($BASE);
+[$c] = $alu2->login("aluno$uniq", $ALU_PW);
+check('Senha antiga do aluno deixa de funcionar', $c === 401, "HTTP $c");
+[$c, $j] = $alu2->login("aluno$uniq", '12345678');
+$st = $alu2->state();
+check('Login com 12345678 exige troca de senha', $c === 200 && !empty($j['must_change']) && !empty($st['me']['must_change']), "HTTP $c");
+[$c] = $alu2->req('POST', '/api/password', ['current' => '12345678', 'new' => '12345678']);
+check('Não aceita manter 12345678', $c === 422, "HTTP $c");
+$ALU_PW = 'Nova' . $uniq . '77';
+[$c] = $alu2->req('POST', '/api/password', ['current' => '12345678', 'new' => $ALU_PW]);
+$st = $alu2->state();
+check('Aluno cria nova senha e a exigência some', $c === 200 && empty($st['me']['must_change']), "HTTP $c");
+$alu3 = new Client($BASE); [$c, $j] = $alu3->login("aluno$uniq", $ALU_PW);
+check('Novo login normal, sem exigência', $c === 200 && empty($j['must_change']), "HTTP $c");
+[$c, $j] = $adm->req('POST', "/api/users/$aluId/profile", ['nome' => 'Aluno Editado', 'email' => "editado$uniq@teste.com", 'usuario' => "edit$uniq", 'cnpj' => '10340101000165', 'sistema' => 'avante']);
+check('Admin edita o cadastro completo', $c === 200, "HTTP $c " . ($j['message'] ?? ''));
+$st = $adm->state(); $eu = null; foreach ($st['users'] as $u) if ((int) $u['id'] === $aluId) $eu = $u;
+check('Cadastro editado salvo (nome, e-mail, usuário, sistema)', $eu && $eu['nome'] === 'Aluno Editado' && $eu['usuario'] === "edit$uniq" && $eu['sistema'] === 'avante' && $eu['empresa'] === 'InfotecSoft');
+[$c, $j] = $adm->req('POST', "/api/users/$aluId/profile", ['nome' => 'X', 'email' => 'invalido', 'usuario' => 'admin', 'cnpj' => '11222333000181']);
+check('Edição com dados inválidos recusada com erros por campo', $c === 422 && isset($j['errors']['nome'], $j['errors']['email'], $j['errors']['usuario'], $j['errors']['cnpj']), "HTTP $c");
+[$c] = $adm->req('POST', '/api/users/1/reset-password');
+check('Ninguém reseta a senha do administrador principal', $c === 404, "HTTP $c");
+[$c] = $alu3->req('POST', "/api/users/$aluId/reset-password");
+check('Aluno não reseta senhas (403)', $c === 403, "HTTP $c");
+// aulas: criar 2, mover, excluir
+[$c, $j1] = $adm->req('POST', '/api/lessons', ['module_id' => $modId, 'source' => 'youtube', 'youtube_id' => 'dQw4w9WgXcQ', 'title' => 'Ordem A ' . $uniq]);
+[$c2, $j2] = $adm->req('POST', '/api/lessons', ['module_id' => $modId, 'source' => 'youtube', 'youtube_id' => 'dQw4w9WgXcQ', 'title' => 'Ordem B ' . $uniq]);
+$la = (int) ($j1['id'] ?? 0); $lb = (int) ($j2['id'] ?? 0);
+check('Publica duas aulas novas', $la && $lb, "HTTP $c/$c2");
+[$c] = $adm->req('POST', "/api/lessons/$lb/move", ['dir' => -1]);
+$st = $adm->state(); $pos = []; foreach ($st['lessons'] as $l) if (in_array((int) $l['id'], [$la, $lb], true)) $pos[(int) $l['id']] = $l['position'];
+check('Mover aula para cima troca a ordem', $c === 200 && ($pos[$lb] ?? 99) < ($pos[$la] ?? 0), json_encode($pos));
+[$c] = $alu3->req('POST', "/api/lessons/$la/delete");
+check('Aluno não exclui aula (403)', $c === 403, "HTTP $c");
+[$c] = $adm->req('POST', "/api/lessons/$la/delete");
+$st = $adm->state(); $still = array_filter($st['lessons'], fn($l) => (int) $l['id'] === $la);
+check('Admin exclui a aula inteira', $c === 200 && !$still, "HTTP $c");
+$adm->req('POST', "/api/lessons/$lb/delete");
+
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";
 foreach ($mine as $l) { $adm->req('POST', '/api/lessons/' . $l['id'] . '/remove-video'); }
@@ -277,7 +329,7 @@ check('Após logout, ações exigem login (401)', $c === 401, "HTTP $c");
 echo "\n11) Limite de cadastros por rede\n";
 $sp = new Client($BASE); $sp->state(); $last = 0;
 for ($i = 0; $i < 6; $i++) {
-    [$last] = $sp->req('POST', '/api/register', array_merge($base, ['doc' => $cpf(), 'email' => "spam$i$uniq@teste.com", 'user' => "spam$i$uniq", 'pw' => 'Senha' . $uniq . '1']));
+    [$last] = $sp->req('POST', '/api/register', array_merge($base, ['email' => "spam$i$uniq@teste.com", 'user' => "spam$i$uniq", 'pw' => 'Senha' . $uniq . '1']));
 }
 check('Cadastros em massa da mesma rede bloqueados (429)', $last === 429, "HTTP $last");
 

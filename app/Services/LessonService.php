@@ -114,6 +114,32 @@ class LessonService
         return ['ok' => true, 'id' => (string) $id, 'updated' => (bool) $editId];
     }
 
+    /** Exclui a aula inteira (com ou sem vídeo). */
+    public function deleteLesson(int $id): array
+    {
+        $l = $this->lessons->find($id);
+        if (!$l) return ['ok' => false, 'status' => 404, 'message' => 'Aula não encontrada.'];
+        $this->lessons->delete($id);
+        $this->storage->deleteVideo($l['file_path']);
+        $this->storage->deleteThumb($l['thumb_path']);
+        return ['ok' => true];
+    }
+
+    /** Sobe (-1) ou desce (+1) a aula dentro do módulo. */
+    public function moveLesson(int $id, int $dir): array
+    {
+        $l = $this->lessons->find($id);
+        if (!$l) return ['ok' => false, 'status' => 404, 'message' => 'Aula não encontrada.'];
+        $list = \App\Core\DB::select('SELECT lesson_id FROM lessons WHERE module_id = ? ORDER BY position, lesson_id', [(int) $l['module_id']]);
+        $ids = array_map(fn($r) => (int) $r['lesson_id'], $list);
+        $i = array_search($id, $ids, true);
+        $j = $i + ($dir < 0 ? -1 : 1);
+        if ($i === false || $j < 0 || $j >= count($ids)) return ['ok' => true];
+        [$ids[$i], $ids[$j]] = [$ids[$j], $ids[$i]];
+        foreach ($ids as $pos => $lid) $this->lessons->update($lid, ['position' => $pos + 1]);
+        return ['ok' => true];
+    }
+
     public function removeVideo(int $id): array
     {
         $l = $this->lessons->find($id);

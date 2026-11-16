@@ -32,6 +32,55 @@ class UserService
         return ['ok' => true];
     }
 
+    public const RESET_PASSWORD = '12345678';
+
+    /** Quem pode mexer no cadastro de $u: usuário comum = equipe com "usuarios"; equipe = só o admin principal. */
+    private function canManage(array $u): ?array
+    {
+        if ($u['role'] === 'admin') return ['ok' => false, 'status' => 404, 'message' => 'Usuário não encontrado.'];
+        if ((int) $u['user_id'] === (int) Auth::id()) return ['ok' => false, 'status' => 403, 'message' => 'Para a sua própria conta use "Meu perfil".'];
+        if (!Gate::isAdmin() && Gate::codesFor((int) $u['user_id'])) return ['ok' => false, 'status' => 403, 'message' => 'Somente o administrador principal altera contas da equipe.'];
+        return null;
+    }
+
+    /** Senha volta para 12345678 e a pessoa é obrigada a criar outra no próximo login. */
+    public function resetPassword(int $id): array
+    {
+        $u = $this->users->find($id);
+        if (!$u) return ['ok' => false, 'status' => 404, 'message' => 'Usuário não encontrado.'];
+        if ($err = $this->canManage($u)) return $err;
+        $this->users->update($id, ['password' => password_hash(self::RESET_PASSWORD, PASSWORD_DEFAULT), 'must_change_password' => 1, 'updated_at' => now()]);
+        return ['ok' => true, 'password' => self::RESET_PASSWORD];
+    }
+
+    /** Edição completa do cadastro pelo administrador. */
+    public function updateProfile(int $id, array $in): array
+    {
+        $u = $this->users->find($id);
+        if (!$u) return ['ok' => false, 'status' => 404, 'message' => 'Usuário não encontrado.'];
+        if ($err = $this->canManage($u)) return $err;
+        $nome = preg_replace('/\s+/', ' ', trim((string) ($in['nome'] ?? '')));
+        $email = trim((string) ($in['email'] ?? ''));
+        $user = trim((string) ($in['usuario'] ?? ''));
+        $cnpj = preg_replace('/\D/', '', (string) ($in['cnpj'] ?? ''));
+        $sys = trim((string) ($in['sistema'] ?? ''));
+        $e = [];
+        if (mb_strlen($nome) < 3 || mb_strlen($nome) > 120) $e['nome'] = 'Informe o nome (3 a 120 caracteres).';
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 150) $e['email'] = 'E-mail inválido.';
+        elseif (\App\Core\DB::select('SELECT user_id FROM users WHERE LOWER(email) = LOWER(?) AND user_id <> ?', [$email, $id])) $e['email'] = 'Este e-mail já é usado por outra conta.';
+        if (!preg_match('/^[a-zA-Z0-9._-]{3,30}$/', $user)) $e['usuario'] = 'Usuário: 3 a 30 letras, números, ponto, hífen ou _.';
+        elseif (strtolower($user) === 'admin' || \App\Core\DB::select('SELECT user_id FROM users WHERE LOWER(username) = LOWER(?) AND user_id <> ?', [$user, $id])) $e['usuario'] = 'Este usuário já está em uso.';
+        $company = (new \App\Repositories\CompanyRepository())->findByCnpj($cnpj);
+        if (!$company) $e['cnpj'] = 'Empresa não encontrada. Use o CNPJ de uma empresa cadastrada no portal.';
+        if ($sys !== '' && !(new \App\Repositories\SystemRepository())->exists($sys)) $e['sistema'] = 'Sistema inválido.';
+        if ($e) return ['ok' => false, 'status' => 422, 'errors' => $e, 'message' => reset($e)];
+        $this->users->update($id, [
+            'name' => $nome, 'email' => $email, 'username' => $user, 'company_name' => $company['name'], 'company_id' => (int) $company['company_id'],
+            'document' => format_doc($company['cnpj']), 'requested_system_id' => $sys ?: null, 'updated_at' => now(),
+        ]);
+        return ['ok' => true];
+    }
+
     /** $modules = [module_id, ...]; $adm = ['aprovacoes','usuarios','modulos','videos'] (só o admin principal altera). */
     public function saveAccess(int $id, array $moduleIds, ?array $adm): array
     {

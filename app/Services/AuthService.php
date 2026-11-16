@@ -35,7 +35,7 @@ class AuthService
         $this->users->update((int) $u['user_id'], ['last_login_at' => now()]);
         Auth::login(['user_id' => (int) $u['user_id'], 'name' => $u['name'], 'username' => $u['username'], 'role' => $u['role'], 'status' => $u['status']]);
         // Senha inicial/fraca: obriga a troca antes de usar o portal
-        $_SESSION['must_change'] = !password_is_strong($password);
+        $_SESSION['must_change'] = !password_is_strong($password) || !empty($u['must_change_password']);
         return ['ok' => true, 'status' => 200];
     }
 
@@ -54,10 +54,10 @@ class AuthService
         $e = [];
         if (count(array_filter(explode(' ', $v['nome']), fn($p) => mb_strlen($p) > 1)) < 2) $e['nome'] = 'Informe seu nome e sobrenome.';
         if (mb_strlen($v['nome']) > 120) $e['nome'] = 'Nome muito longo.';
-        if (mb_strlen($v['emp']) < 2) $e['emp'] = 'Informe o nome da empresa.';
-        elseif (mb_strlen($v['emp']) > 120) $e['emp'] = 'Nome da empresa muito longo.';
-        if ($v['doc'] === '') $e['doc'] = 'Informe o CNPJ da empresa ou seu CPF.';
-        elseif (!(strlen($v['doc']) === 11 ? valid_cpf($v['doc']) : (strlen($v['doc']) === 14 && valid_cnpj($v['doc'])))) $e['doc'] = 'CPF ou CNPJ inválido. Confira os números.';
+        $company = null;
+        if ($v['doc'] === '') $e['doc'] = 'Informe o CNPJ da empresa.';
+        elseif (strlen($v['doc']) !== 14 || !valid_cnpj($v['doc'])) $e['doc'] = 'CNPJ inválido. Confira os números.';
+        elseif (!($company = (new \App\Repositories\CompanyRepository())->findByCnpj($v['doc']))) $e['doc'] = 'Empresa não encontrada no portal. Confira o CNPJ ou fale com a InfotecSoft.';
         if (!$this->systems->exists($v['sys'])) $e['sys'] = 'Selecione o sistema que sua empresa utiliza.';
         if (!filter_var($v['email'], FILTER_VALIDATE_EMAIL) || mb_strlen($v['email']) > 150) $e['email'] = 'Informe um e-mail válido (ex.: nome@empresa.com.br).';
         elseif ($this->users->emailInUse($v['email'])) $e['email'] = 'Já existe uma solicitação com este e-mail.';
@@ -68,10 +68,10 @@ class AuthService
             return ['ok' => false, 'errors' => $e];
         }
         $id = $this->users->create([
-            'name' => $v['nome'], 'company_name' => $v['emp'], 'document' => format_doc($v['doc']), 'email' => $v['email'],
+            'name' => $v['nome'], 'company_name' => $company['name'], 'company_id' => (int) $company['company_id'], 'document' => format_doc($v['doc']), 'email' => $v['email'],
             'username' => $v['user'], 'password' => password_hash($v['pw'], PASSWORD_DEFAULT), 'role' => 'user', 'status' => 'pendente',
             'requested_system_id' => $v['sys'], 'created_at' => now(),
         ]);
-        return ['ok' => true, 'user' => ['id' => (string) $id, 'nome' => $v['nome'], 'empresa' => $v['emp'], 'sistema' => $v['sys'], 'usuario' => $v['user']]];
+        return ['ok' => true, 'user' => ['id' => (string) $id, 'nome' => $v['nome'], 'empresa' => $company['name'], 'sistema' => $v['sys'], 'usuario' => $v['user']]];
     }
 }
