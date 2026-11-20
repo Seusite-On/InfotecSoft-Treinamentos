@@ -424,6 +424,32 @@ check('Prova desativada não aceita respostas', $c === 404, "HTTP $c");
 [$c] = $adm->req('POST', "/api/quizzes/$modId/delete");
 check('Equipe exclui a prova', $c === 200, "HTTP $c");
 
+/* ---------------- 9d. Super usuário ---------------- */
+echo "\n9d) Super usuário\n";
+[$c] = $alu3->req('POST', "/api/users/$aluId/access", ['modules' => [], 'super' => true]);
+check('Usuário comum não se torna super usuário (403)', $c === 403, "HTTP $c");
+[$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [], 'adm' => [], 'super' => true]);
+check('Admin marca super usuário', $c === 200, "HTTP $c");
+$st = $alu3->state();
+$allMods = count($st['modules'] ?? []);
+check('Super usuário recebe todas as permissões administrativas', !empty($st['me']['super']) && count($st['me']['adm']) === 5, json_encode($st['me']['adm'] ?? null));
+check('Super usuário vê todos os módulos (perms = todos)', array_key_exists('perms', $st['me']) && $st['me']['perms'] === null && count(array_filter($st['lessons'], fn($l) => $l['locked'])) === 0);
+[$c] = $alu3->req('GET', '/api/reports/ranking');
+check('Super usuário abre relatórios', $c === 200, "HTTP $c");
+[$c, $j] = $alu3->req('POST', '/api/modules', ['system' => 'fusion-web', 'name' => 'Super ' . $uniq]);
+$supMod = (int) ($j['id'] ?? 0);
+check('Super usuário cria módulo', $c === 200 && $supMod > 0, "HTTP $c");
+$st = $alu3->state();
+check('Módulo novo já aparece liberado para o super usuário', (bool) array_filter($st['modules'], fn($m) => $m['id'] === $supMod));
+$adm->req('POST', "/api/modules/$supMod/delete");
+[$c] = $alu3->req('POST', "/api/users/$aluId/access", ['modules' => [], 'adm' => ['usuarios']]);
+check('Super usuário não mexe no próprio acesso administrativo', $c === 403, "HTTP $c");
+$st = $adm->state(); $uu = array_values(array_filter($st['users'], fn($u) => $u['id'] === (string) $aluId));
+check('Lista de usuários mostra o super usuário', $uu && $uu[0]['super'] === true);
+[$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [], 'adm' => [], 'super' => false]);
+$st = $alu3->state();
+check('Desmarcar super usuário tira as permissões', $c === 200 && empty($st['me']['super']) && $st['me']['adm'] === [], "HTTP $c");
+
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";
 foreach ($mine as $l) { $adm->req('POST', '/api/lessons/' . $l['id'] . '/remove-video'); }

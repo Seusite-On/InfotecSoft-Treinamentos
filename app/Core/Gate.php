@@ -37,6 +37,9 @@ class Gate
             return false;
         }
         $row = self::row((int) Auth::id());
+        if ((int) ($row['is_super'] ?? 0) === 1) {
+            return true;
+        }
         return isset($row[$col]) && (int) $row[$col] === 1;
     }
 
@@ -44,6 +47,9 @@ class Gate
     public static function codesFor(int $userId): array
     {
         $row = self::row($userId);
+        if (self::isSuper($userId)) {
+            return array_keys(self::MAP);
+        }
         $out = [];
         foreach (self::MAP as $code => $col) {
             if ((int) ($row[$col] ?? 0) === 1) {
@@ -66,6 +72,12 @@ class Gate
     public static function forget(int $userId): void
     {
         unset(self::$cache[$userId]);
+    }
+
+    /** Super usuário: todas as permissões e todos os módulos. */
+    public static function isSuper(int $userId): bool
+    {
+        return (int) (self::row($userId)['is_super'] ?? 0) === 1;
     }
 
     protected static function row(int $userId): array

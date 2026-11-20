@@ -86,7 +86,7 @@ class UserService
     }
 
     /** $modules = [module_id, ...]; $adm = ['aprovacoes','usuarios','modulos','videos'] (só o admin principal altera). */
-    public function saveAccess(int $id, array $moduleIds, ?array $adm): array
+    public function saveAccess(int $id, array $moduleIds, ?array $adm, ?bool $super = null): array
     {
         $u = $this->users->find($id);
         if (!$u || $u['role'] === 'admin') return ['ok' => false, 'status' => 404, 'message' => 'Usuário não encontrado.'];
@@ -94,7 +94,8 @@ class UserService
         $valid = array_column($this->modules->all(), 'module_id');
         $valid = array_map('intval', $valid);
         $ids = array_values(array_intersect(array_map('intval', $moduleIds), $valid));
-        if ($adm !== null && !Gate::isAdmin()) return ['ok' => false, 'status' => 403, 'message' => 'Somente o administrador principal altera o acesso administrativo.'];
+        if (($adm !== null || $super !== null) && !Gate::isAdmin()) return ['ok' => false, 'status' => 403, 'message' => 'Somente o administrador principal altera o acesso administrativo.'];
+        if (!Gate::isAdmin() && Gate::isSuper($id)) return ['ok' => false, 'status' => 403, 'message' => 'Somente o administrador principal altera um super usuário.'];
         if ((int) $id === (int) Auth::id() && !Gate::isAdmin()) return ['ok' => false, 'status' => 403, 'message' => 'Você não pode alterar as próprias permissões.'];
         $this->users->setModuleAccess($id, $ids, Auth::id());
         if ($adm !== null) {
@@ -102,8 +103,17 @@ class UserService
             foreach (Gate::MAP as $code => $col) {
                 $cols[$col] = in_array($code, $adm, true) ? 1 : 0;
             }
+            if ($super !== null) $cols['is_super'] = $super ? 1 : 0;
             $this->users->savePermissions($id, $cols, Auth::id());
             Gate::forget($id);
+        } elseif ($super !== null) {
+            $this->users->savePermissions($id, ['is_super' => $super ? 1 : 0], Auth::id());
+            Gate::forget($id);
+        }
+        if ($super) {
+            // super usuário: libera também todos os módulos de todos os sistemas
+            $ids = $valid;
+            $this->users->setModuleAccess($id, $ids, Auth::id());
         }
         return ['ok' => true, 'modules' => count($ids)];
     }

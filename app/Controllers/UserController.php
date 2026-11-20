@@ -35,7 +35,8 @@ class UserController extends Controller
         $req = new Request();
         $modules = $req->input('modules', []);
         $adm = $req->input('adm', null);
-        $r = (new UserService())->saveAccess((int) $id, is_array($modules) ? $modules : [], is_array($adm) ? array_values(array_filter($adm, 'is_string')) : null);
+        $super = $req->input('super', null);
+        $r = (new UserService())->saveAccess((int) $id, is_array($modules) ? $modules : [], is_array($adm) ? array_values(array_filter($adm, 'is_string')) : null, $super === null ? null : (bool) $super);
         $r['ok'] ? json_out($r) : json_fail($r['message'], $r['status']);
     }
 }

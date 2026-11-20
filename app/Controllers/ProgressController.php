@@ -33,9 +33,8 @@ class ProgressController extends Controller
         if ($ev === 'start') {
             if (!$row) {
                 DB::table('lesson_views')->insert(['user_id' => $uid, 'lesson_id' => (int) $id, 'started_at' => now(), 'points' => 0]);
-            } elseif (!$row['completed_at']) {
-                DB::table('lesson_views')->where('user_id', $uid)->where('lesson_id', (int) $id)->update(['started_at' => now()]);
             }
+            // reabrir a aula não zera o início: o tempo assistido antes continua valendo
             json_out(['ok' => true, 'done' => (bool) ($row['completed_at'] ?? false)]);
         }
 

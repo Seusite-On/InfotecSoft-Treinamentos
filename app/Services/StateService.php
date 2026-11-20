@@ -41,10 +41,11 @@ class StateService
         $uid = (int) $me['user_id'];
         $isAdmin = $me['role'] === 'admin';
         $adm = $isAdmin ? array_keys(Gate::MAP) : Gate::codesFor($uid);
-        $access = $isAdmin ? [] : ($this->users->accessMap($uid)[$uid] ?? []);
+        $isSuper = !$isAdmin && Gate::isSuper($uid);
+        $access = ($isAdmin || $isSuper) ? [] : ($this->users->accessMap($uid)[$uid] ?? []);
         $state['me'] = [
             'id' => (string) $uid, 'nome' => $me['name'], 'empresa' => $me['company_name'] ?? '', 'usuario' => $me['username'],
-            'admin' => $isAdmin, 'must_change' => !empty($_SESSION['must_change']), 'adm' => $isAdmin ? [] : $adm, 'perms' => $isAdmin ? null : (object) $access,
+            'admin' => $isAdmin, 'must_change' => !empty($_SESSION['must_change']), 'adm' => $isAdmin ? [] : $adm, 'perms' => ($isAdmin || $isSuper) ? null : (object) $access, 'super' => $isSuper,
         ];
 
         $modules = $this->modules->all();
@@ -98,7 +99,7 @@ class StateService
                     'id' => (string) $id, 'nome' => $u['name'], 'empresa' => $u['company_name'] ?? '', 'doc' => $u['document'] ?? '',
                     'email' => $u['email'], 'sistema' => !empty($u['requested_all']) ? 'todos' : ($u['requested_system_id'] ?? ''), 'usuario' => $u['username'], 'status' => $u['status'],
                     'revogado' => (bool) $u['revoked'], 'troca_senha' => (bool) ($u['must_change_password'] ?? 0), 'criado' => ms($u['created_at']), 'decidido' => ms($u['decided_at']),
-                    'perms' => (object) ($accessAll[$id] ?? []), 'adm' => $adm,
+                    'perms' => (object) ($accessAll[$id] ?? []), 'adm' => $adm, 'super' => (int) ($permsAll[$id]['is_super'] ?? 0) === 1,
                 ];
             }, $this->users->allUsers());
         } else {
