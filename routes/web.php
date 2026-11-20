@@ -11,6 +11,7 @@ use App\Controllers\MediaController;
 
 // Portal (página única)
 Route::get('/', [AppController::class, 'index']);
+Route::get('/api/version', [AppController::class, 'versionJson']);
 
 // Estado inicial da tela (usuário logado, sistemas, módulos, aulas e — para a equipe — usuários)
 Route::get('/api/state', [StateController::class, 'show']);
