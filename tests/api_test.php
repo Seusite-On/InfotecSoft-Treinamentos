@@ -339,6 +339,47 @@ check('Aluno só vê as próprias sugestões', count(array_filter($st['suggestio
 [$c] = $adm->req('POST', "/api/suggestions/$sgId/delete");
 check('Admin exclui a sugestão', $c === 200, "HTTP $c");
 
+/* ---------------- 9b. Pontuação e relatório ---------------- */
+echo "\n9b) Pontuação por vídeo e relatório\n";
+$env = parse_ini_file(__DIR__ . '/../.env');
+$pdo = new PDO("mysql:host={$env['DB_HOST']};port={$env['DB_PORT']};dbname={$env['DB_DATABASE']}", $env['DB_USERNAME'], $env['DB_PASSWORD']);
+[$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => []]);
+check('Libera o módulo de teste para o aluno (sem cargo)', $c === 200, "HTTP $c");
+$vl = null; foreach ($mine as $l) if ($l['source'] !== 'none') { $vl = $l; break; }
+$st = $alu3->state();
+check('Estado traz pontos zerados e lista de assistidas', ($st['me']['pontos'] ?? null) === 0 && ($st['me']['assistidas'] ?? null) === []);
+[$c, $j] = $alu3->req('POST', "/api/lessons/{$vl['id']}/progress", ['event' => 'done']);
+check('Concluir sem começar não dá pontos', $c === 422 && ($j['code'] ?? '') === 'not_started', "HTTP $c");
+[$c] = $alu3->req('POST', "/api/lessons/{$vl['id']}/progress", ['event' => 'start']);
+check('Começar a assistir registra o início', $c === 200, "HTTP $c");
+[$c, $j] = $alu3->req('POST', "/api/lessons/{$vl['id']}/progress", ['event' => 'done']);
+check('Pular direto para o fim não dá pontos (tempo mínimo)', $c === 422 && ($j['code'] ?? '') === 'too_fast', "HTTP $c");
+$pdo->prepare('UPDATE lesson_views SET started_at = NOW() - INTERVAL 2 HOUR WHERE user_id = ? AND lesson_id = ?')->execute([$aluId, $vl['id']]);
+[$c, $j] = $alu3->req('POST', "/api/lessons/{$vl['id']}/progress", ['event' => 'done']);
+check('Assistir até o fim dá 10 pontos', $c === 200 && ($j['points'] ?? 0) === 10 && ($j['total'] ?? 0) === 10, "HTTP $c " . json_encode($j));
+[$c, $j] = $alu3->req('POST', "/api/lessons/{$vl['id']}/progress", ['event' => 'done']);
+check('Assistir de novo não soma pontos em dobro', $c === 200 && !empty($j['already']) && ($j['total'] ?? 0) === 10, "HTTP $c");
+$st = $alu3->state();
+check('Estado mostra 10 pontos e o vídeo como assistido', ($st['me']['pontos'] ?? 0) === 10 && in_array($vl['id'], $st['me']['assistidas'] ?? [], true));
+$other = $pdo->query("SELECT l.lesson_id FROM lessons l WHERE l.module_id <> $modId AND l.video_source = 'youtube' LIMIT 1")->fetchColumn();
+[$c] = $alu3->req('POST', "/api/lessons/$other/progress", ['event' => 'start']);
+check('Não pontua em aula de módulo sem acesso (403)', $c === 403, "HTTP $c");
+[$c] = $alu3->req('POST', "/api/lessons/{$vl['id']}/progress", ['event' => 'hack']);
+check('Evento inválido recusado', $c === 422, "HTTP $c");
+[$c] = $alu3->req('GET', '/api/reports/ranking');
+check('Aluno sem permissão não vê o relatório (403)', $c === 403, "HTTP $c");
+[$c, $j] = $adm->req('GET', '/api/reports/ranking?dias=30');
+$me = array_values(array_filter($j['rows'] ?? [], fn($r) => $r['id'] === (string) $aluId));
+check('Admin vê o aluno no ranking com 10 pontos e 1 vídeo', $c === 200 && $me && $me[0]['pontos'] === 10 && $me[0]['videos'] === 1, "HTTP $c");
+check('Relatório traz os vídeos mais assistidos', !empty($j['top']), "HTTP $c");
+[$c, $j] = $adm->req('GET', '/api/reports/ranking?sistema=sistema-inexistente');
+check('Filtro por sistema funciona', $c === 200 && ($j['rows'] ?? null) === [], "HTTP $c");
+[$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['relatorios']]);
+[$c] = $alu3->req('GET', '/api/reports/ranking');
+check('Com a permissão "relatorios", o usuário vê o relatório', $c === 200, "HTTP $c");
+$st = $adm->state(); $yl = array_values(array_filter($st['lessons'], fn($l) => $l['yt'] === '5R5_ArgyMyA'));
+check('Vídeos trazem a data de publicação do YouTube', $yl && $yl[0]['published'] === '2026-05-14' || ($yl && preg_match('/^\d{4}-\d\d-\d\d$/', $yl[0]['published'])), json_encode($yl[0]['published'] ?? null));
+
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";
 foreach ($mine as $l) { $adm->req('POST', '/api/lessons/' . $l['id'] . '/remove-video'); }

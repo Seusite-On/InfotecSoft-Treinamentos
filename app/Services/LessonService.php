@@ -61,6 +61,15 @@ class LessonService
 
         $now = now();
         $data = ['module_id' => $moduleId, 'updated_at' => $now, 'video_updated_at' => $now, 'video_source' => $source];
+        // Data de publicação: a informada no formulário ou, para YouTube, a data do próprio vídeo
+        $pub = trim((string) ($in['published'] ?? ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $pub)) {
+            $data['published_at'] = $pub;
+        } elseif ($source === 'youtube' && (!$edit || ($edit['youtube_id'] ?? '') !== $yt || empty($edit['published_at']))) {
+            $data['published_at'] = self::youtubeDate($yt) ?? ($source === 'youtube' ? null : date('Y-m-d'));
+        } elseif ($source === 'file' && $hasUpload) {
+            $data['published_at'] = date('Y-m-d');
+        }
         if ($isNewOrAdmin) {
             $data['title'] = mb_substr($title, 0, 150);
             $data['description'] = mb_substr($desc, 0, 2000);
@@ -114,6 +123,21 @@ class LessonService
                 'file_size' => null, 'file_mime' => null, 'thumb_path' => null, 'updated_at' => $now]);
         }
         return ['ok' => true, 'id' => (string) $id, 'updated' => (bool) $editId];
+    }
+
+    /** Data em que o vídeo foi publicado no YouTube (lida da página do vídeo). Null se não conseguir. */
+    public static function youtubeDate(string $id): ?string
+    {
+        if (!preg_match('/^[A-Za-z0-9_-]{11}$/', $id) || !function_exists('curl_init')) return null;
+        $ch = curl_init('https://www.youtube.com/watch?v=' . $id . '&hl=pt-BR');
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_HTTPHEADER => ['Accept-Language: pt-BR,pt;q=0.9', 'Cookie: CONSENT=YES+1'],
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36']);
+        $html = (string) curl_exec($ch);
+        curl_close($ch);
+        if (preg_match('/"(?:uploadDate|publishDate)":"(\d{4}-\d{2}-\d{2})/', $html, $m)) return $m[1];
+        if (preg_match('/itemprop="(?:uploadDate|datePublished)" content="(\d{4}-\d{2}-\d{2})/', $html, $m)) return $m[1];
+        return null;
     }
 
     /** Exclui a aula inteira (com ou sem vídeo). */

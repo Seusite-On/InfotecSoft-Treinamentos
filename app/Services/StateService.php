@@ -73,7 +73,7 @@ class StateService
             $id = (int) $l['lesson_id'];
             return [
                 'id' => (string) $id, 'module_id' => (int) $l['module_id'], 'title' => $l['title'], 'description' => $l['description'] ?? '',
-                'duration' => $l['duration'] ?? '', 'position' => (int) $l['position'], 'origin' => $l['origin'],
+                'duration' => $l['duration'] ?? '', 'published' => $l['published_at'] ?? '', 'position' => (int) $l['position'], 'origin' => $l['origin'],
                 'source' => $ok ? $l['video_source'] : 'none', 'locked' => !$ok,
                 'yt' => $ok && $l['video_source'] === 'youtube' ? $l['youtube_id'] : '',
                 'file' => $ok && $l['video_source'] === 'file',
@@ -104,6 +104,12 @@ class StateService
         } else {
             $state['users'] = [];
         }
+        // Pontuação do usuário: aulas concluídas e total de pontos
+        $views = \App\Core\DB::select('SELECT lesson_id, points FROM lesson_views WHERE user_id = ? AND completed_at IS NOT NULL', [$uid]);
+        $state['me']['pontos'] = array_sum(array_map(fn($v) => (int) $v['points'], $views));
+        $state['me']['assistidas'] = array_map(fn($v) => (string) $v['lesson_id'], $views);
+        $state['pontos_por_video'] = \App\Controllers\ProgressController::POINTS_PER_VIDEO;
+
         // Últimos acessos (equipe com permissão de usuários)
         if (Gate::allows('usuarios')) {
             $state['access'] = array_map(fn($r) => [

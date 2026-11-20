@@ -16,6 +16,7 @@ class Gate
         'usuarios'   => 'can_manage_users',
         'modulos'    => 'can_manage_modules',
         'videos'     => 'can_manage_videos',
+        'relatorios' => 'can_view_reports',
     ];
 
     public static function isAdmin(): bool
