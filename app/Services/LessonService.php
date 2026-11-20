@@ -122,7 +122,7 @@ class LessonService
             else $this->lessons->update((int) $edit['lesson_id'], ['video_source' => 'none', 'youtube_id' => null, 'file_path' => null, 'file_name' => null,
                 'file_size' => null, 'file_mime' => null, 'thumb_path' => null, 'updated_at' => $now]);
         }
-        return ['ok' => true, 'id' => (string) $id, 'updated' => (bool) $editId];
+        return ['ok' => true, 'id' => (string) $id, 'updated' => (bool) $editId, 'created' => $created];
     }
 
     /** Data em que o vídeo foi publicado no YouTube (lida da página do vídeo). Null se não conseguir. */

@@ -450,6 +450,36 @@ check('Lista de usuários mostra o super usuário', $uu && $uu[0]['super'] === t
 $st = $alu3->state();
 check('Desmarcar super usuário tira as permissões', $c === 200 && empty($st['me']['super']) && $st['me']['adm'] === [], "HTTP $c");
 
+/* ---------------- 9e. Postagem de vídeos por qualquer usuário ---------------- */
+echo "\n9e) Postagem da comunidade (+5 pontos)\n";
+[$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => [], 'super' => false]);
+$st0 = $alu3->state(); $p0 = $st0['me']['pontos'];
+$other = (int) $pdo->query("SELECT module_id FROM modules WHERE module_id <> $modId LIMIT 1")->fetchColumn();
+$newYt = substr(str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(random_bytes(9))), 0, 11);
+[$c] = $alu3->req('POST', '/api/lessons', ['module_id' => $other, 'source' => 'youtube', 'youtube_id' => $newYt, 'title' => 'Postagem fora']);
+check('Aluno não posta em módulo sem acesso (403)', $c === 403, "HTTP $c");
+[$c, $j] = $alu3->req('POST', '/api/lessons', ['module_id' => $modId, 'source' => 'youtube', 'youtube_id' => $newYt, 'title' => 'Postagem da comunidade ' . $uniq]);
+check('Aluno posta vídeo novo do YouTube e ganha +5', $c === 200 && ($j['points'] ?? 0) === 5 && ($j['total'] ?? 0) === $p0 + 5, "HTTP $c " . json_encode($j));
+$postId = $j['id'] ?? '';
+[$c, $j] = $alu3->req('POST', '/api/lessons', ['module_id' => $modId, 'source' => 'youtube', 'youtube_id' => $newYt, 'title' => 'Repetido']);
+check('Vídeo repetido não pode ser postado de novo', $c === 422, "HTTP $c");
+[$c, $j] = $alu3->req('POST', '/api/lessons', ['module_id' => $modId, 'source' => 'youtube', 'youtube_id' => 'xx', 'title' => 'Link ruim']);
+check('Link inválido recusado', $c === 422, "HTTP $c");
+[$c] = $alu3->req('POST', '/api/lessons', ['module_id' => $modId, 'edit_id' => $postId, 'source' => 'youtube', 'youtube_id' => 'abcdefghijk', 'title' => 'Tentando editar']);
+$t = $pdo->query('SELECT title FROM lessons WHERE lesson_id = ' . (int) $postId)->fetchColumn();
+check('Aluno não edita postagem existente (cria nova ou nada)', $t === 'Postagem da comunidade ' . $uniq);
+$pdo->exec("DELETE FROM lessons WHERE youtube_id = 'abcdefghijk'");
+$st = $alu3->state(); $pl = array_values(array_filter($st['lessons'], fn($l) => $l['id'] === $postId));
+check('Postagem mostra o autor e conta no estado', $pl && $pl[0]['autor'] !== '' && $st['me']['postagens'] === 1);
+[$c] = $alu3->req('POST', "/api/lessons/$postId/delete");
+check('Aluno não exclui aulas (403)', $c === 403, "HTTP $c");
+[$c, $j] = $adm->req('GET', '/api/reports/ranking');
+$me = array_values(array_filter($j['rows'] ?? [], fn($r) => $r['id'] === (string) $aluId));
+check('Ranking conta as postagens', $me && $me[0]['postagens'] === 1);
+[$c] = $adm->req('POST', "/api/lessons/$postId/delete");
+$st = $alu3->state();
+check('Postagem excluída pela equipe: os 5 pontos saem', $c === 200 && $st['me']['pontos'] === $p0, "HTTP $c");
+
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";
 foreach ($mine as $l) { $adm->req('POST', '/api/lessons/' . $l['id'] . '/remove-video'); }

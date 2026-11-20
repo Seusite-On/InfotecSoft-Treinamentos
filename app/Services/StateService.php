@@ -69,11 +69,14 @@ class StateService
                 }
             }
         }
-        $state['lessons'] = array_map(function ($l) use ($seeAll, $allowed) {
+        $autores = [];
+        foreach (\App\Core\DB::select("SELECT DISTINCT u.user_id, u.name FROM lessons l JOIN users u ON u.user_id = l.created_by WHERE u.role <> 'admin'") as $a) $autores[(int) $a['user_id']] = $a['name'];
+        $state['lessons'] = array_map(function ($l) use ($seeAll, $allowed, $autores) {
             $ok = $seeAll || isset($allowed[(int) $l['module_id']]);
             $id = (int) $l['lesson_id'];
             return [
                 'id' => (string) $id, 'module_id' => (int) $l['module_id'], 'title' => $l['title'], 'description' => $l['description'] ?? '',
+                'autor' => $autores[(int) ($l['created_by'] ?? 0)] ?? '', 'autor_id' => isset($autores[(int) ($l['created_by'] ?? 0)]) ? (string) $l['created_by'] : '', 'post_pts' => (int) ($l['post_points'] ?? 0),
                 'duration' => $l['duration'] ?? '', 'published' => $l['published_at'] ?? '', 'position' => (int) $l['position'], 'origin' => $l['origin'],
                 'source' => $ok ? $l['video_source'] : 'none', 'locked' => !$ok,
                 'yt' => $ok && $l['video_source'] === 'youtube' ? $l['youtube_id'] : '',
@@ -111,6 +114,8 @@ class StateService
         $state['me']['assistidas'] = array_map(fn($v) => (string) $v['lesson_id'], $views);
         $state['pontos_por_video'] = \App\Controllers\ProgressController::POINTS_PER_VIDEO;
         $state['me']['pontos'] = \App\Controllers\ProgressController::total($uid);
+        $state['me']['postagens'] = (int) (\App\Core\DB::select('SELECT COUNT(*) AS n FROM lessons WHERE created_by = ? AND post_points > 0', [$uid])[0]['n'] ?? 0);
+        $state['pontos_por_postagem'] = \App\Controllers\LessonController::POINTS_PER_POST;
         $lv = \App\Core\DB::select('SELECT lesson_id, started_at FROM lesson_views WHERE user_id = ? ORDER BY started_at DESC LIMIT 1', [$uid]);
         $state['me']['ultima'] = $lv ? ['lesson_id' => (string) $lv[0]['lesson_id'], 'em' => ms($lv[0]['started_at'])] : null;
         $state['me']['provas'] = array_map(fn($a) => ['module_id' => (int) $a['module_id'], 'best' => (int) round((float) $a['best']), 'passed' => (bool) $a['passed'], 'tentativas' => (int) $a['tentativas']],
