@@ -28,6 +28,9 @@ Route::post('/api/users/{id}/access', [UserController::class, 'access']);
 Route::post('/api/users/{id}/reset-password', [UserController::class, 'resetPassword']);
 Route::post('/api/users/{id}/profile', [UserController::class, 'profile']);
 
+// Notificações: marcar como vistas
+Route::post('/api/notifications/seen', [App\Controllers\ProgressController::class, 'notifSeen']);
+
 // Pontuação e relatórios
 Route::post('/api/lessons/{id}/progress', [App\Controllers\ProgressController::class, 'track']);
 Route::get('/api/reports/ranking', [App\Controllers\ReportController::class, 'ranking']);

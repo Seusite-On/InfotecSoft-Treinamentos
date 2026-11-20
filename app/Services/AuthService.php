@@ -80,7 +80,7 @@ class AuthService
         $id = $this->users->create([
             'name' => $v['nome'], 'company_name' => $company['name'], 'company_id' => (int) $company['company_id'], 'document' => format_doc($v['doc']), 'email' => $v['email'],
             'username' => $v['user'], 'password' => password_hash($v['pw'], PASSWORD_DEFAULT), 'role' => 'user', 'status' => 'pendente',
-            'requested_system_id' => $all ? null : $v['sys'], 'requested_all' => $all ? 1 : 0, 'created_at' => now(),
+            'requested_system_id' => $all ? null : $v['sys'], 'requested_all' => $all ? 1 : 0, 'created_at' => now(), 'notif_seen_at' => now(),
         ]);
         return ['ok' => true, 'user' => ['id' => (string) $id, 'nome' => $v['nome'], 'empresa' => $company['name'], 'sistema' => $v['sys'], 'usuario' => $v['user']]];
     }

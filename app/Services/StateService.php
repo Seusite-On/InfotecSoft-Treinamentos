@@ -114,6 +114,7 @@ class StateService
         $state['me']['assistidas'] = array_map(fn($v) => (string) $v['lesson_id'], $views);
         $state['pontos_por_video'] = \App\Controllers\ProgressController::POINTS_PER_VIDEO;
         $state['me']['pontos'] = \App\Controllers\ProgressController::total($uid);
+        $state['me']['notif_visto'] = ms($me['notif_seen_at'] ?? null);
         $state['me']['postagens'] = (int) (\App\Core\DB::select('SELECT COUNT(*) AS n FROM lessons WHERE created_by = ? AND post_points > 0', [$uid])[0]['n'] ?? 0);
         $state['pontos_por_postagem'] = \App\Controllers\LessonController::POINTS_PER_POST;
         $lv = \App\Core\DB::select('SELECT lesson_id, started_at FROM lesson_views WHERE user_id = ? ORDER BY started_at DESC LIMIT 1', [$uid]);

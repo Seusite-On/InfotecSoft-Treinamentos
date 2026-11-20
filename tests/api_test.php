@@ -480,6 +480,17 @@ check('Ranking conta as postagens', $me && $me[0]['postagens'] === 1);
 $st = $alu3->state();
 check('Postagem excluída pela equipe: os 5 pontos saem', $c === 200 && $st['me']['pontos'] === $p0, "HTTP $c");
 
+/* ---------------- 9f. Notificações ---------------- */
+echo "\n9f) Notificações de vídeos novos\n";
+$st = $alu3->state();
+check('Estado traz quando o usuário viu as notificações', array_key_exists('notif_visto', $st['me']));
+[$c] = $alu3->req('POST', '/api/notifications/seen');
+$st = $alu3->state();
+check('Abrir o sino marca as notificações como vistas', $c === 200 && ($st['me']['notif_visto'] ?? 0) > (time() - 60) * 1000, "HTTP $c");
+$anon = new Client($BASE); $anon->state();
+[$c] = $anon->req('POST', '/api/notifications/seen');
+check('Sem login não marca notificações (401)', $c === 401, "HTTP $c");
+
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";
 foreach ($mine as $l) { $adm->req('POST', '/api/lessons/' . $l['id'] . '/remove-video'); }
