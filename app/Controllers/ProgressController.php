@@ -56,8 +56,15 @@ class ProgressController extends Controller
     public function notifSeen(): void
     {
         $me = require_login();
-        DB::table('users')->where('user_id', (int) $me['user_id'])->update(['notif_seen_at' => now()]);
-        json_out(['ok' => true, 'em' => time() * 1000]);
+        $uid = (int) $me['user_id'];
+        DB::table('users')->where('user_id', $uid)->update(['notif_seen_at' => now()]);
+        // também grava cada vídeo que estava na lista como lido (não volta a aparecer)
+        $body = json_decode((string) file_get_contents('php://input'), true);
+        $ids = array_slice(array_values(array_unique(array_filter(array_map('intval', (array) ($body['ids'] ?? [])), fn($i) => $i > 0))), 0, 500);
+        foreach ($ids as $lid) {
+            DB::statement('INSERT IGNORE INTO notif_reads (user_id, lesson_id, read_at) SELECT ?, lesson_id, ? FROM lessons WHERE lesson_id = ?', [$uid, now(), $lid]);
+        }
+        json_out(['ok' => true, 'em' => time() * 1000, 'lidas' => count($ids)]);
     }
 
     /** Uma notificação lida: o vídeo sai da lista de novos daquele usuário. */
@@ -65,7 +72,7 @@ class ProgressController extends Controller
     {
         $me = require_login();
         if (!DB::table('lessons')->where('lesson_id', (int) $id)->first()) json_fail('Aula não encontrada.', 404);
-        DB::statement('INSERT IGNORE INTO notif_reads (user_id, lesson_id, read_at) VALUES (?, ?, NOW())', [(int) $me['user_id'], (int) $id]);
+        DB::statement('INSERT IGNORE INTO notif_reads (user_id, lesson_id, read_at) VALUES (?, ?, ?)', [(int) $me['user_id'], (int) $id, now()]);
         json_out(['ok' => true]);
     }
 

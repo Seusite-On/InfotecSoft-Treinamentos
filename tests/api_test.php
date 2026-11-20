@@ -343,6 +343,8 @@ check('Admin exclui a sugestão', $c === 200, "HTTP $c");
 echo "\n9b) Pontuação por vídeo e relatório\n";
 $env = parse_ini_file(__DIR__ . '/../.env');
 $pdo = new PDO("mysql:host={$env['DB_HOST']};port={$env['DB_PORT']};dbname={$env['DB_DATABASE']}", $env['DB_USERNAME'], $env['DB_PASSWORD']);
+date_default_timezone_set('America/Sao_Paulo');
+$pdo->exec("SET time_zone = '" . date('P') . "'");
 [$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => []]);
 check('Libera o módulo de teste para o aluno (sem cargo)', $c === 200, "HTTP $c");
 $vl = null; foreach ($mine as $l) if ($l['source'] !== 'none') { $vl = $l; break; }
@@ -490,6 +492,9 @@ check('Abrir o sino marca as notificações como vistas', $c === 200 && ($st['me
 [$c] = $alu3->req('POST', "/api/notifications/{$vl['id']}/read");
 $st = $alu3->state();
 check('Clicar numa notificação marca só aquele vídeo como lido', $c === 200 && in_array($vl['id'], $st['me']['notif_lidas'] ?? [], true), "HTTP $c");
+[$c, $j] = $alu3->req('POST', '/api/notifications/seen', ['ids' => [(int) $vl['id'], 999999]]);
+check('"Marcar todas como lidas" grava cada vídeo da lista', $c === 200 && ($j['lidas'] ?? 0) === 2, "HTTP $c");
+$tz = $pdo->query("SELECT TIMESTAMPDIFF(MINUTE, NOW(), (SELECT MAX(created_at) FROM lessons))")->fetchColumn();
 [$c] = $alu3->req('POST', '/api/notifications/999999/read');
 check('Notificação de aula inexistente: 404', $c === 404, "HTTP $c");
 $anon = new Client($BASE); $anon->state();

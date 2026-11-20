@@ -32,6 +32,8 @@ class Database
             $options[PDO::ATTR_EMULATE_PREPARES] = false;
         }
         self::$pdo = new PDO($dsn, $cfg['username'], $cfg['password'], $options);
+        // O banco usa o mesmo fuso do PHP (Brasília): NOW() no SQL e now() no PHP dão a mesma hora
+        try { self::$pdo->exec("SET time_zone = '" . date('P') . "'"); } catch (\Throwable $e) {}
         return self::$pdo;
     }
 
