@@ -1,0 +1,5 @@
+-- Conhecimento fiscal: novo módulo "Regimes tributários" (entre Documentos fiscais e Reforma tributária)
+UPDATE modules SET position = 3 WHERE system_id = 'fiscal' AND name = 'Reforma tributária';
+INSERT IGNORE INTO modules (system_id, name, icon, position) VALUES ('fiscal', 'Regimes tributários', 'chart', 2);
+INSERT INTO lessons (module_id, title, description, duration, published_at, position, origin, video_source, youtube_id, video_updated_at, created_at, updated_at) SELECT m.module_id, 'Lucro Real e Lucro Presumido: qual a diferença', 'A diferença entre os regimes de Lucro Real e Lucro Presumido e os impactos de cada um nos impostos da empresa. Vídeo do canal SimTax.', '5:27', '2018-08-23', 1, 'admin', 'youtube', 'hpQNT9sKhAc', NOW(), NOW(), NOW() FROM modules m WHERE m.system_id = 'fiscal' AND m.name = 'Regimes tributários' AND NOT EXISTS (SELECT 1 FROM (SELECT youtube_id FROM lessons) x WHERE x.youtube_id = 'hpQNT9sKhAc');
+INSERT IGNORE INTO user_module_access (user_id, module_id, created_at) SELECT u.user_id, m.module_id, NOW() FROM users u JOIN modules m ON m.system_id = 'fiscal' WHERE u.role = 'user' AND u.status = 'aprovado'
