@@ -487,6 +487,11 @@ check('Estado traz quando o usuário viu as notificações', array_key_exists('n
 [$c] = $alu3->req('POST', '/api/notifications/seen');
 $st = $alu3->state();
 check('Abrir o sino marca as notificações como vistas', $c === 200 && ($st['me']['notif_visto'] ?? 0) > (time() - 60) * 1000, "HTTP $c");
+[$c] = $alu3->req('POST', "/api/notifications/{$vl['id']}/read");
+$st = $alu3->state();
+check('Clicar numa notificação marca só aquele vídeo como lido', $c === 200 && in_array($vl['id'], $st['me']['notif_lidas'] ?? [], true), "HTTP $c");
+[$c] = $alu3->req('POST', '/api/notifications/999999/read');
+check('Notificação de aula inexistente: 404', $c === 404, "HTTP $c");
 $anon = new Client($BASE); $anon->state();
 [$c] = $anon->req('POST', '/api/notifications/seen');
 check('Sem login não marca notificações (401)', $c === 401, "HTTP $c");

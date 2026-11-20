@@ -30,6 +30,7 @@ Route::post('/api/users/{id}/profile', [UserController::class, 'profile']);
 
 // Notificações: marcar como vistas
 Route::post('/api/notifications/seen', [App\Controllers\ProgressController::class, 'notifSeen']);
+Route::post('/api/notifications/{id}/read', [App\Controllers\ProgressController::class, 'notifRead']);
 
 // Pontuação e relatórios
 Route::post('/api/lessons/{id}/progress', [App\Controllers\ProgressController::class, 'track']);

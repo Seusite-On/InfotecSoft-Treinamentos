@@ -60,6 +60,15 @@ class ProgressController extends Controller
         json_out(['ok' => true, 'em' => time() * 1000]);
     }
 
+    /** Uma notificação lida: o vídeo sai da lista de novos daquele usuário. */
+    public function notifRead(string $id): void
+    {
+        $me = require_login();
+        if (!DB::table('lessons')->where('lesson_id', (int) $id)->first()) json_fail('Aula não encontrada.', 404);
+        DB::statement('INSERT IGNORE INTO notif_reads (user_id, lesson_id, read_at) VALUES (?, ?, NOW())', [(int) $me['user_id'], (int) $id]);
+        json_out(['ok' => true]);
+    }
+
     public static function total(int $uid): int
     {
         $r = DB::select('SELECT (SELECT COALESCE(SUM(points),0) FROM lesson_views WHERE user_id = ?) + (SELECT COALESCE(SUM(points),0) FROM quiz_attempts WHERE user_id = ?) + (SELECT COALESCE(SUM(post_points),0) FROM lessons WHERE created_by = ?) AS t', [$uid, $uid, $uid]);
