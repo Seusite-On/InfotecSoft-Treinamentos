@@ -380,6 +380,50 @@ check('Com a permissão "relatorios", o usuário vê o relatório', $c === 200, 
 $st = $adm->state(); $yl = array_values(array_filter($st['lessons'], fn($l) => $l['yt'] === '5R5_ArgyMyA'));
 check('Vídeos trazem a data de publicação do YouTube', $yl && $yl[0]['published'] === '2026-05-14' || ($yl && preg_match('/^\d{4}-\d\d-\d\d$/', $yl[0]['published'])), json_encode($yl[0]['published'] ?? null));
 
+/* ---------------- 9c. Provas e progresso ---------------- */
+echo "\n9c) Provas por módulo e progresso da equipe\n";
+[$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => []]);
+$qz = ['title' => 'Prova teste', 'pass_pct' => 60, 'points' => 30, 'active' => true, 'questions' => [
+  ['q' => 'Quanto é 1+1?', 'options' => ['1', '2', '3'], 'correct' => 1, 'explanation' => 'Dois.'],
+  ['q' => 'Cor do céu?', 'options' => ['Azul', 'Verde'], 'correct' => 0],
+  ['q' => 'Capital do Brasil?', 'options' => ['Rio', 'Brasília', 'SP'], 'correct' => 1]]];
+[$c] = $alu3->req('POST', "/api/quizzes/$modId", $qz);
+check('Aluno não cria prova (403)', $c === 403, "HTTP $c");
+[$c, $j] = $adm->req('POST', "/api/quizzes/$modId", array_merge($qz, ['questions' => [['q' => 'Sem resposta certa', 'options' => ['a', 'b'], 'correct' => 5]]]));
+check('Prova com resposta inválida recusada', $c === 422, "HTTP $c");
+[$c, $j] = $adm->req('POST', "/api/quizzes/$modId", $qz);
+check('Equipe cria a prova do módulo', $c === 200, "HTTP $c " . ($j['message'] ?? ''));
+[$c, $j] = $alu3->req('GET', "/api/quizzes/$modId");
+$qq = $j['quiz']['questions'] ?? [];
+check('Aluno abre a prova (3 perguntas)', $c === 200 && count($qq) === 3, "HTTP $c");
+check('A prova não entrega as respostas certas ao navegador', !str_contains(json_encode($j), '"correct"'));
+[$c] = $alu3->req('GET', "/api/quizzes/$modId/edit");
+check('Aluno não abre o editor da prova (403)', $c === 403, "HTTP $c");
+$ids = array_column($qq, 'id');
+[$c, $j] = $alu3->req('POST', "/api/quizzes/$modId/submit", ['answers' => [$ids[0] => 0, $ids[1] => 1, $ids[2] => 0]]);
+check('Errar a prova: reprovado, sem pontos', $c === 200 && $j['passed'] === false && $j['score'] === 0 && $j['points'] === 0, "HTTP $c");
+[$c, $j] = $alu3->req('POST', "/api/quizzes/$modId/submit", ['answers' => [$ids[0] => 1, $ids[1] => 0, $ids[2] => 0]]);
+check('Acertar 2 de 3 (66%): aprovado com +30 pontos', $c === 200 && $j['passed'] === true && $j['points'] === 30 && $j['pontos_total'] === 40, "HTTP $c " . json_encode([$j['score'] ?? null, $j['pontos_total'] ?? null]));
+check('Correção traz a explicação', ($j['results'][0]['explanation'] ?? '') === 'Dois.');
+[$c, $j] = $alu3->req('POST', "/api/quizzes/$modId/submit", ['answers' => [$ids[0] => 1, $ids[1] => 0, $ids[2] => 1]]);
+check('Refazer depois de aprovado não soma pontos de novo', $c === 200 && $j['points'] === 0 && $j['pontos_total'] === 40, "HTTP $c");
+$st = $alu3->state(); $pv = array_values(array_filter($st['me']['provas'] ?? [], fn($p) => $p['module_id'] === $modId));
+check('Estado traz a melhor nota e "onde parou"', $pv && $pv[0]['best'] === 100 && $pv[0]['passed'] && ($st['me']['ultima']['lesson_id'] ?? '') === $vl['id'] && $st['me']['pontos'] === 40);
+check('Estado lista as provas existentes', (bool) array_filter($st['quizzes'] ?? [], fn($z) => $z['module_id'] === $modId && $z['n'] === 3));
+[$c, $j] = $adm->req('GET', '/api/reports/progress');
+$u = array_values(array_filter($j['users'] ?? [], fn($x) => $x['id'] === (string) $aluId));
+check('Admin vê o progresso do aluno (vídeos, onde parou, provas)', $c === 200 && $u && in_array($vl['id'], $u[0]['assistidas'], true) && $u[0]['ultima'] && count($u[0]['provas']) === 1 && $u[0]['pontos'] === 40, "HTTP $c");
+[$c, $j] = $adm->req('GET', '/api/reports/ranking');
+$me = array_values(array_filter($j['rows'] ?? [], fn($r) => $r['id'] === (string) $aluId));
+check('Ranking soma pontos de vídeos + provas', $me && $me[0]['pontos'] === 40 && $me[0]['provas'] === 1);
+[$c] = $alu3->req('GET', '/api/reports/progress');
+check('Aluno sem permissão não vê o progresso da equipe (403)', $c === 403, "HTTP $c");
+[$c, $j] = $adm->req('POST', "/api/quizzes/$modId", array_merge($qz, ['active' => false]));
+[$c] = $alu3->req('POST', "/api/quizzes/$modId/submit", ['answers' => []]);
+check('Prova desativada não aceita respostas', $c === 404, "HTTP $c");
+[$c] = $adm->req('POST', "/api/quizzes/$modId/delete");
+check('Equipe exclui a prova', $c === 200, "HTTP $c");
+
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";
 foreach ($mine as $l) { $adm->req('POST', '/api/lessons/' . $l['id'] . '/remove-video'); }

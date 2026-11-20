@@ -30,6 +30,14 @@ Route::post('/api/users/{id}/profile', [UserController::class, 'profile']);
 // Pontuação e relatórios
 Route::post('/api/lessons/{id}/progress', [App\Controllers\ProgressController::class, 'track']);
 Route::get('/api/reports/ranking', [App\Controllers\ReportController::class, 'ranking']);
+Route::get('/api/reports/progress', [App\Controllers\ReportController::class, 'progress']);
+
+// Provas por módulo
+Route::get('/api/quizzes/{id}', [App\Controllers\QuizController::class, 'show']);
+Route::get('/api/quizzes/{id}/edit', [App\Controllers\QuizController::class, 'edit']);
+Route::post('/api/quizzes/{id}', [App\Controllers\QuizController::class, 'save']);
+Route::post('/api/quizzes/{id}/submit', [App\Controllers\QuizController::class, 'submit']);
+Route::post('/api/quizzes/{id}/delete', [App\Controllers\QuizController::class, 'destroy']);
 
 // Sugestões de melhoria
 Route::post('/api/suggestions', [App\Controllers\SuggestionController::class, 'store']);

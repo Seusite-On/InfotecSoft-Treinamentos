@@ -109,6 +109,14 @@ class StateService
         $state['me']['pontos'] = array_sum(array_map(fn($v) => (int) $v['points'], $views));
         $state['me']['assistidas'] = array_map(fn($v) => (string) $v['lesson_id'], $views);
         $state['pontos_por_video'] = \App\Controllers\ProgressController::POINTS_PER_VIDEO;
+        $state['me']['pontos'] = \App\Controllers\ProgressController::total($uid);
+        $lv = \App\Core\DB::select('SELECT lesson_id, started_at FROM lesson_views WHERE user_id = ? ORDER BY started_at DESC LIMIT 1', [$uid]);
+        $state['me']['ultima'] = $lv ? ['lesson_id' => (string) $lv[0]['lesson_id'], 'em' => ms($lv[0]['started_at'])] : null;
+        $state['me']['provas'] = array_map(fn($a) => ['module_id' => (int) $a['module_id'], 'best' => (int) round((float) $a['best']), 'passed' => (bool) $a['passed'], 'tentativas' => (int) $a['tentativas']],
+            \App\Core\DB::select('SELECT z.module_id, MAX(a.score * 100 / a.total) AS best, MAX(a.passed) AS passed, COUNT(*) AS tentativas FROM quiz_attempts a JOIN quizzes z ON z.quiz_id = a.quiz_id WHERE a.user_id = ? GROUP BY z.module_id', [$uid]));
+        // Provas existentes (por módulo)
+        $state['quizzes'] = array_map(fn($z) => ['module_id' => (int) $z['module_id'], 'title' => $z['title'], 'n' => (int) $z['n'], 'pass_pct' => (int) $z['pass_pct'], 'points' => (int) $z['points'], 'active' => (bool) $z['active']],
+            \App\Core\DB::select('SELECT z.*, (SELECT COUNT(*) FROM quiz_questions q WHERE q.quiz_id = z.quiz_id) AS n FROM quizzes z' . ($isAdmin || \App\Core\Gate::allows('modulos') ? '' : ' WHERE z.active = 1')));
 
         // Últimos acessos (equipe com permissão de usuários)
         if (Gate::allows('usuarios')) {

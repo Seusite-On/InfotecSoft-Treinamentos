@@ -55,7 +55,7 @@ class ProgressController extends Controller
 
     public static function total(int $uid): int
     {
-        $r = DB::select('SELECT COALESCE(SUM(points),0) AS t FROM lesson_views WHERE user_id = ?', [$uid]);
+        $r = DB::select('SELECT (SELECT COALESCE(SUM(points),0) FROM lesson_views WHERE user_id = ?) + (SELECT COALESCE(SUM(points),0) FROM quiz_attempts WHERE user_id = ?) AS t', [$uid, $uid]);
         return (int) ($r[0]['t'] ?? 0);
     }
 
