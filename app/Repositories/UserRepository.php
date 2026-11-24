@@ -57,7 +57,10 @@ class UserRepository
 
     public function moduleIds(int $userId): array
     {
-        return array_map(fn($r) => (int) $r['module_id'], DB::select('SELECT module_id FROM user_module_access WHERE user_id = ?', [$userId]));
+        $own = array_map(fn($r) => (int) $r['module_id'], DB::select('SELECT module_id FROM user_module_access WHERE user_id = ?', [$userId]));
+        $u = DB::select("SELECT status FROM users WHERE user_id = ?", [$userId]);
+        // sistemas abertos para todos: liberados para qualquer usuário aprovado
+        return ($u && $u[0]['status'] === 'aprovado') ? array_values(array_unique(array_merge($own, (new SystemRepository())->publicModuleIds()))) : $own;
     }
 
     public function hasAnyAccess(int $userId): bool

@@ -223,8 +223,10 @@ check('Admin define acesso do aluno (nenhum módulo)', $c === 200, "HTTP $c");
 check('Aluno aprovado entra (senha com espaço preservada)', $c === 200 && empty($j['must_change']), "HTTP $c " . ($j['message'] ?? ''));
 $st = $alu->state();
 check('Aluno não recebe lista de usuários', empty($st['users']));
-$visible = array_filter($st['lessons'] ?? [], fn($l) => !empty($l['yt']) || !empty($l['file']));
-check('Aluno sem módulos não vê nenhum vídeo', count($visible) === 0, (string) count($visible));
+$pubSys = array_column(array_filter($st['systems'] ?? [], fn($x) => !empty($x['public'])), 'id');
+$pubMods = array_column(array_filter($st['modules'] ?? [], fn($m) => in_array($m['system'], $pubSys, true)), 'id');
+$visible = array_filter($st['lessons'] ?? [], fn($l) => (!empty($l['yt']) || !empty($l['file'])) && !in_array($l['module_id'], $pubMods, true));
+check('Aluno sem módulos não vê nenhum vídeo (fora dos sistemas abertos para todos)', count($visible) === 0, (string) count($visible));
 if ($fileLesson) {
     [$c] = $alu->req('GET', '/media/video/' . $fileLesson['id']);
     check('Aluno sem acesso ao módulo não baixa o vídeo (403)', $c === 403, "HTTP $c");
@@ -500,6 +502,36 @@ check('Notificação de aula inexistente: 404', $c === 404, "HTTP $c");
 $anon = new Client($BASE); $anon->state();
 [$c] = $anon->req('POST', '/api/notifications/seen');
 check('Sem login não marca notificações (401)', $c === 401, "HTTP $c");
+
+/* ---------------- 9g. Sistemas criados pelo portal ---------------- */
+echo "\n9g) Criar, editar e excluir sistemas\n";
+[$c] = $alu3->req('POST', '/api/systems', ['name' => 'SEFAZ ' . $uniq]);
+check('Usuário sem permissão não cria sistema (403)', $c === 403, "HTTP $c");
+[$c, $j] = $adm->req('POST', '/api/systems', ['name' => 'X']);
+check('Nome curto demais recusado', $c === 422, "HTTP $c");
+[$c, $j] = $adm->req('POST', '/api/systems', ['name' => 'SEFAZ ' . $uniq, 'desc' => 'Consultas e serviços da SEFAZ', 'icon' => 'shield', 'color' => '#dc2626', 'public' => true]);
+$sysId = $j['id'] ?? '';
+check('Admin cria o sistema "SEFAZ"', $c === 200 && $sysId !== '', "HTTP $c " . json_encode($j));
+[$c] = $adm->req('POST', '/api/systems', ['name' => 'sefaz ' . $uniq]);
+check('Nome repetido recusado', $c === 422, "HTTP $c");
+$st = $adm->state(); $sx = array_values(array_filter($st['systems'], fn($x) => $x['id'] === $sysId));
+check('Sistema aparece com ícone, cor e "aberto para todos"', $sx && $sx[0]['icon'] === 'shield' && $sx[0]['color'] === '#DC2626' && $sx[0]['public'] === true);
+[$c, $j] = $adm->req('POST', '/api/modules', ['system' => $sysId, 'name' => 'Consultas ' . $uniq, 'icon' => 'globe']);
+$sm = (int) ($j['id'] ?? 0);
+check('Cria módulo dentro do sistema novo', $c === 200 && $sm > 0, "HTTP $c");
+$st = $alu3->state();
+check('Sistema aberto: aluno aprovado já vê o módulo sem liberar um a um', in_array('Consultas ' . $uniq, (array) ($st['me']['perms'][$sysId] ?? []), true));
+[$c] = $adm->req('POST', "/api/systems/$sysId/delete");
+check('Não exclui sistema que ainda tem módulos', $c === 422, "HTTP $c");
+[$c] = $adm->req('POST', "/api/systems/$sysId", ['name' => 'SEFAZ editado ' . $uniq, 'icon' => 'globe', 'color' => '#7C3AED', 'public' => false]);
+$st = $alu3->state();
+check('Editar: nome muda e, fechado, o aluno deixa de ver', $c === 200 && !in_array('Consultas ' . $uniq, (array) ($st['me']['perms'][$sysId] ?? []), true), "HTTP $c");
+[$c] = $adm->req('POST', "/api/systems/$sysId/move", ['dir' => -1]);
+check('Mover sistema no menu', $c === 200, "HTTP $c");
+$adm->req('POST', "/api/modules/$sm/delete");
+[$c] = $adm->req('POST', "/api/systems/$sysId/delete");
+$st = $adm->state();
+check('Exclui o sistema vazio', $c === 200 && !array_filter($st['systems'], fn($x) => $x['id'] === $sysId), "HTTP $c");
 
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";

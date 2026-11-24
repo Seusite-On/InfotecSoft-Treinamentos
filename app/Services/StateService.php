@@ -22,7 +22,7 @@ class StateService
 
     public function build(): array
     {
-        $systems = array_map(fn($s) => ['id' => $s['system_id'], 'name' => $s['name'], 'desc' => $s['description']], $this->systems->all());
+        $systems = array_map(fn($s) => ['id' => $s['system_id'], 'name' => $s['name'], 'desc' => $s['description'], 'icon' => $s['icon'] ?? null, 'color' => $s['color'] ?? null, 'public' => (bool) ($s['is_public'] ?? 0)], $this->systems->all());
         $state = ['ok' => true, 'csrf' => CSRF::token(), 'me' => null, 'systems' => $systems, 'versao' => \App\Controllers\AppController::version()];
         // Números reais para a tela de login (sem dados pessoais).
         $st = \App\Core\DB::select("SELECT (SELECT COUNT(*) FROM lessons WHERE video_source <> 'none') AS v, (SELECT COUNT(*) FROM modules) AS m")[0] ?? [];
@@ -43,6 +43,12 @@ class StateService
         $adm = $isAdmin ? array_keys(Gate::MAP) : Gate::codesFor($uid);
         $isSuper = !$isAdmin && Gate::isSuper($uid);
         $access = ($isAdmin || $isSuper) ? [] : ($this->users->accessMap($uid)[$uid] ?? []);
+        // sistemas abertos para todos: os módulos entram no acesso de qualquer usuário aprovado
+        if (!$isAdmin && !$isSuper && ($me['status'] ?? '') === 'aprovado') {
+            foreach (\App\Core\DB::select('SELECT m.system_id, m.name FROM modules m JOIN systems s ON s.system_id = m.system_id WHERE s.is_public = 1 AND s.active = 1') as $pm) {
+                if (!in_array($pm['name'], $access[$pm['system_id']] ?? [], true)) $access[$pm['system_id']][] = $pm['name'];
+            }
+        }
         $state['me'] = [
             'id' => (string) $uid, 'nome' => $me['name'], 'empresa' => $me['company_name'] ?? '', 'usuario' => $me['username'],
             'admin' => $isAdmin, 'must_change' => !empty($_SESSION['must_change']), 'adm' => $isAdmin ? [] : $adm, 'perms' => ($isAdmin || $isSuper) ? null : (object) $access, 'super' => $isSuper,
