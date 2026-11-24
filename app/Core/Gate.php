@@ -24,10 +24,11 @@ class Gate
         'sugestoes'  => 'can_manage_suggestions',
         'postar'     => 'can_post_videos',
         'sugerir'    => 'can_send_suggestions',
+        'anotar'     => 'can_take_notes',
     ];
 
     /** Recursos de usuário comum: vêm ligados por padrão e não fazem a pessoa ser "equipe". */
-    public const USER_FEATURES = ['postar', 'sugerir'];
+    public const USER_FEATURES = ['postar', 'sugerir', 'anotar'];
 
     private static function on(array $row, string $code, string $col): bool
     {

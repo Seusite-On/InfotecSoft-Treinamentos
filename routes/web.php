@@ -32,6 +32,12 @@ Route::post('/api/users/{id}/profile', [UserController::class, 'profile']);
 Route::post('/api/notifications/seen', [App\Controllers\ProgressController::class, 'notifSeen']);
 Route::post('/api/notifications/{id}/read', [App\Controllers\ProgressController::class, 'notifRead']);
 
+// Anotações pessoais por aula
+Route::get('/api/lessons/{id}/notes', [App\Controllers\NoteController::class, 'index']);
+Route::post('/api/lessons/{id}/notes', [App\Controllers\NoteController::class, 'store']);
+Route::post('/api/notes/{id}', [App\Controllers\NoteController::class, 'update']);
+Route::post('/api/notes/{id}/delete', [App\Controllers\NoteController::class, 'destroy']);
+
 // Sistemas (criar/editar pelo portal)
 Route::post('/api/systems', [App\Controllers\SystemController::class, 'store']);
 Route::post('/api/systems/{id}', [App\Controllers\SystemController::class, 'update']);

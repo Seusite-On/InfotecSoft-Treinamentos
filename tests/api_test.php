@@ -453,7 +453,7 @@ check('Usuário comum não se torna super usuário (403)', $c === 403, "HTTP $c"
 check('Admin marca super usuário', $c === 200, "HTTP $c");
 $st = $alu3->state();
 $allMods = count($st['modules'] ?? []);
-check('Super usuário recebe todas as permissões', !empty($st['me']['super']) && count($st['me']['adm']) === 12, json_encode($st['me']['adm'] ?? null));
+check('Super usuário recebe todas as permissões', !empty($st['me']['super']) && count($st['me']['adm']) === 13, json_encode($st['me']['adm'] ?? null));
 check('Super usuário vê todos os módulos (perms = todos)', array_key_exists('perms', $st['me']) && $st['me']['perms'] === null && count(array_filter($st['lessons'], fn($l) => $l['locked'])) === 0);
 [$c] = $alu3->req('GET', '/api/reports/ranking');
 check('Super usuário abre relatórios', $c === 200, "HTTP $c");
@@ -579,11 +579,46 @@ $novoId = (int) $pdo->lastInsertId();
 $reg = new Client($BASE); $reg->state();
 [$c] = $reg->req('POST', '/api/login', ['username' => "novo$uniq", 'password' => 'Senha1234']);
 $st = $reg->state();
-check('Usuário novo (sem permissões salvas) já pode postar e sugerir, e não é equipe', $c === 200 && ($st['me']['adm'] ?? null) === ['postar', 'sugerir'], "HTTP $c " . json_encode($st['me']['adm'] ?? null));
+check('Usuário novo (sem permissões salvas) já pode postar, sugerir e anotar, e não é equipe', $c === 200 && ($st['me']['adm'] ?? null) === ['postar', 'sugerir', 'anotar'], "HTTP $c " . json_encode($st['me']['adm'] ?? null));
 $st = $adm->state(); $nu = array_values(array_filter($st['users'] ?? [], fn($u) => $u['id'] === (string) $novoId));
-check('Na lista de usuários, quem nunca teve permissões aparece com postar e sugerir ligados', $nu && $nu[0]['adm'] === ['postar', 'sugerir'], json_encode($nu[0]['adm'] ?? null));
+check('Na lista de usuários, quem nunca teve permissões aparece com postar, sugerir e anotar ligados', $nu && $nu[0]['adm'] === ['postar', 'sugerir', 'anotar'], json_encode($nu[0]['adm'] ?? null));
 $pdo->exec("DELETE FROM users WHERE user_id = $novoId");
 $adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['postar', 'sugerir']]);
+
+/* ---------------- 9i. Anotações pessoais ---------------- */
+echo "\n9i) Anotações por aula (só a pessoa vê)\n";
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['postar', 'sugerir', 'anotar']]);
+[$c, $j] = $alu3->req('POST', "/api/lessons/{$vl['id']}/notes", ['body' => "Lembrar: F6 busca na Receita\nsegunda linha", 't' => 75]);
+$nota = $j['note']['id'] ?? '';
+check('Aluno cria anotação com o minuto do vídeo', $c === 200 && ($j['note']['t'] ?? null) === 75 && $nota !== '', "HTTP $c");
+[$c] = $alu3->req('POST', "/api/lessons/{$vl['id']}/notes", ['body' => '   ']);
+check('Anotação vazia recusada', $c === 422, "HTTP $c");
+[$c] = $alu3->req('POST', "/api/lessons/{$vl['id']}/notes", ['body' => str_repeat('a', 2001)]);
+check('Anotação acima de 2000 caracteres recusada', $c === 422, "HTTP $c");
+[$c, $j] = $adm->req('POST', "/api/lessons/{$vl['id']}/notes", ['body' => 'Nota do admin na mesma aula']);
+$notaAdm = $j['note']['id'] ?? '';
+[$c, $j] = $alu3->req('GET', "/api/lessons/{$vl['id']}/notes");
+check('Aluno vê só a própria anotação (não a do admin)', $c === 200 && count($j['notes'] ?? []) === 1 && $j['notes'][0]['id'] === $nota, "HTTP $c " . count($j['notes'] ?? []));
+check('Quebras de linha preservadas', str_contains($j['notes'][0]['body'] ?? '', "\nsegunda linha"));
+[$c] = $alu3->req('POST', "/api/notes/$notaAdm", ['body' => 'tentando editar a do outro']);
+check('Não edita anotação de outra pessoa (404)', $c === 404, "HTTP $c");
+[$c] = $alu3->req('POST', "/api/notes/$notaAdm/delete");
+check('Não apaga anotação de outra pessoa (404)', $c === 404, "HTTP $c");
+[$c, $j] = $alu3->req('POST', "/api/notes/$nota", ['body' => 'Texto editado', 't' => 80]);
+check('Edita a própria anotação', $c === 200 && ($j['note']['body'] ?? '') === 'Texto editado' && $j['note']['editado'], "HTTP $c");
+$st = $alu3->state();
+check('Estado mostra quantas anotações há em cada aula', (int) ($st['me']['notas'][$vl['id']] ?? 0) === 1);
+$other = (int) $pdo->query("SELECT lesson_id FROM lessons l JOIN modules m USING(module_id) JOIN systems s ON s.system_id = m.system_id WHERE l.module_id <> $modId AND s.is_public = 0 LIMIT 1")->fetchColumn();
+[$c] = $alu3->req('POST', "/api/lessons/$other/notes", ['body' => 'aula sem acesso']);
+check('Não anota em aula sem acesso (403)', $c === 403, "HTTP $c");
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['postar', 'sugerir']]);
+[$c] = $alu3->req('GET', "/api/lessons/{$vl['id']}/notes");
+check('Sem a permissão "Fazer anotações", bloqueado (403)', $c === 403, "HTTP $c");
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['postar', 'sugerir', 'anotar']]);
+[$c] = $alu3->req('POST', "/api/notes/$nota/delete");
+[$c2, $j] = $alu3->req('GET', "/api/lessons/{$vl['id']}/notes");
+check('Apaga a própria anotação', $c === 200 && ($j['notes'] ?? null) === [], "HTTP $c");
+$adm->req('POST', "/api/notes/$notaAdm/delete");
 
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";

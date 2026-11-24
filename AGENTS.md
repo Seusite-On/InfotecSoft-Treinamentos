@@ -45,7 +45,7 @@ Códigos em `Gate::MAP` (coluna em `user_permissions`) e na lista `ADM_PERMS`/`U
 - Pessoas: `aprovacoes`, `usuarios`, `acessos` (últimos acessos)
 - Conteúdo: `sistemas`, `modulos`, `videos`, `provas`
 - Acompanhamento: `relatorios`, `equipe` (progresso da equipe), `sugestoes` (gerenciar)
-- Recursos de usuário comum (`Gate::USER_FEATURES`, ligados por padrão, não tornam a pessoa "equipe"): `postar`, `sugerir`
+- Recursos de usuário comum (`Gate::USER_FEATURES`, ligados por padrão, não tornam a pessoa "equipe"): `postar`, `sugerir`, `anotar` (anotações pessoais por aula)
 Ao criar um recurso: nova coluna na migração (com a cópia de quem já tinha o acesso), entrada no `Gate::MAP`, `require_login('codigo')` no controller, entrada em `ADM_PERMS` (com o grupo) ou `USR_PERMS`, `can('codigo')` no menu/tela/rota, e teste em `tests/api_test.php`.
 Só o administrador principal altera permissões; super usuário tem todas.
 
