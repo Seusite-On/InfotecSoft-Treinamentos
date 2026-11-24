@@ -382,6 +382,11 @@ check('Relatório por período (datas) e por usuário traz só ele', $c === 200 
 check('Extrato do usuário lista o vídeo assistido com pontos', $c === 200 && ($j['detalhe'][0]['tipo'] ?? '') === 'video' && ($j['detalhe'][0]['pontos'] ?? 0) === 10);
 [$c, $j] = $adm->req('GET', "/api/reports/ranking?de=2020-01-01&ate=2020-01-31&usuario=$aluId");
 check('Período sem atividade volta vazio', $c === 200 && ($j['rows'] ?? null) === [] && ($j['detalhe'] ?? null) === []);
+$sysAlu = $pdo->query("SELECT system_id FROM modules WHERE module_id = $modId")->fetchColumn();
+[$c, $j] = $adm->req('GET', "/api/reports/ranking?usuario=$aluId&sistema=e-trade,avante,$sysAlu");
+check('Relatório com vários sistemas juntos inclui o sistema do aluno', $c === 200 && count($j['rows'] ?? []) === 1, "HTTP $c");
+[$c, $j] = $adm->req('GET', "/api/reports/ranking?usuario=$aluId&sistema=e-trade,avante");
+check('Vários sistemas sem o do aluno: ele não aparece', $c === 200 && ($j['rows'] ?? null) === [], "HTTP $c");
 [$c] = $adm->req('GET', "/api/reports/ranking?de=2026-12-31&ate=2026-01-01");
 check('Data inicial depois da final é recusada', $c === 422, "HTTP $c");
 [$c, $j] = $adm->req('GET', '/api/reports/ranking?sistema=sistema-inexistente');

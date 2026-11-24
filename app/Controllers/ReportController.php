@@ -32,7 +32,14 @@ class ReportController extends Controller
         // por usuário
         $uid = $q->int('usuario');
         if ($uid > 0) { $wv .= ' AND v.user_id = ?'; $av[] = $uid; $wq .= ' AND a.user_id = ?'; $aq[] = $uid; $wp .= ' AND l.created_by = ?'; $ap[] = $uid; }
-        if ($sys !== '') { $wv .= ' AND m.system_id = ?'; $av[] = $sys; $wq .= ' AND m.system_id = ?'; $aq[] = $sys; $wp .= ' AND m.system_id = ?'; $ap[] = $sys; }
+        // um ou vários sistemas (separados por vírgula)
+        $sysList = array_values(array_unique(array_filter(array_map('trim', explode(',', $sys)), fn($x) => preg_match('/^[a-z0-9-]{1,40}$/', $x))));
+        $sysList = array_slice($sysList, 0, 50);
+        if ($sysList) {
+            $in = ' AND m.system_id IN (' . implode(',', array_fill(0, count($sysList), '?')) . ')';
+            $wv .= $in; $wq .= $in; $wp .= $in;
+            array_push($av, ...$sysList); array_push($aq, ...$sysList); array_push($ap, ...$sysList);
+        }
         $views = DB::select("SELECT v.user_id, COUNT(*) AS videos, SUM(v.points) AS pontos, MAX(v.completed_at) AS ultimo, COUNT(DISTINCT l.module_id) AS modulos
               FROM lesson_views v JOIN lessons l ON l.lesson_id = v.lesson_id JOIN modules m ON m.module_id = l.module_id
              WHERE $wv GROUP BY v.user_id", $av);
