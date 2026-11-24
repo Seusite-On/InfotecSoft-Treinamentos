@@ -324,7 +324,11 @@ check('Bloqueio por excesso registrado', is_array($acc) && (bool) array_filter($
 $st = $alu3->state();
 check('Aluno não recebe a lista de acessos', !isset($st['access']));
 
-// sugestões de melhoria
+// sugestões de melhoria (recurso de usuário "sugerir")
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['postar']]);
+[$c] = $alu3->req('POST', '/api/suggestions', ['category' => 'conteudo', 'message' => 'Sem a permissão de enviar sugestões']);
+check('Sem a permissão "Enviar sugestões", não envia (403)', $c === 403, "HTTP $c");
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['postar', 'sugerir']]);
 [$c, $j] = $alu3->req('POST', '/api/suggestions', ['category' => 'conteudo', 'message' => 'curta']);
 check('Sugestão muito curta recusada', $c === 422, "HTTP $c");
 [$c, $j] = $alu3->req('POST', '/api/suggestions', ['category' => 'conteudo', 'message' => '<b>Aula</b> sobre MDF-e no Fusion Web, por favor ' . $uniq]);
@@ -449,7 +453,7 @@ check('Usuário comum não se torna super usuário (403)', $c === 403, "HTTP $c"
 check('Admin marca super usuário', $c === 200, "HTTP $c");
 $st = $alu3->state();
 $allMods = count($st['modules'] ?? []);
-check('Super usuário recebe todas as permissões administrativas', !empty($st['me']['super']) && count($st['me']['adm']) === 5, json_encode($st['me']['adm'] ?? null));
+check('Super usuário recebe todas as permissões', !empty($st['me']['super']) && count($st['me']['adm']) === 12, json_encode($st['me']['adm'] ?? null));
 check('Super usuário vê todos os módulos (perms = todos)', array_key_exists('perms', $st['me']) && $st['me']['perms'] === null && count(array_filter($st['lessons'], fn($l) => $l['locked'])) === 0);
 [$c] = $alu3->req('GET', '/api/reports/ranking');
 check('Super usuário abre relatórios', $c === 200, "HTTP $c");
@@ -469,10 +473,13 @@ check('Desmarcar super usuário tira as permissões', $c === 200 && empty($st['m
 
 /* ---------------- 9e. Postagem de vídeos por qualquer usuário ---------------- */
 echo "\n9e) Postagem da comunidade (+5 pontos)\n";
-[$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => [], 'super' => false]);
+[$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['sugerir'], 'super' => false]);
 $st0 = $alu3->state(); $p0 = $st0['me']['pontos'];
 $other = (int) $pdo->query("SELECT module_id FROM modules WHERE module_id <> $modId LIMIT 1")->fetchColumn();
 $newYt = substr(str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(random_bytes(9))), 0, 11);
+[$c, $j] = $alu3->req('POST', '/api/lessons', ['module_id' => $modId, 'source' => 'youtube', 'youtube_id' => $newYt, 'title' => 'Sem permissão de postar']);
+check('Sem a permissão "Postar vídeos", não posta (403)', $c === 403, "HTTP $c");
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['sugerir', 'postar']]);
 [$c] = $alu3->req('POST', '/api/lessons', ['module_id' => $other, 'source' => 'youtube', 'youtube_id' => $newYt, 'title' => 'Postagem fora']);
 check('Aluno não posta em módulo sem acesso (403)', $c === 403, "HTTP $c");
 [$c, $j] = $alu3->req('POST', '/api/lessons', ['module_id' => $modId, 'source' => 'youtube', 'youtube_id' => $newYt, 'title' => 'Postagem da comunidade ' . $uniq]);
@@ -545,6 +552,38 @@ $adm->req('POST', "/api/modules/$sm/delete");
 [$c] = $adm->req('POST', "/api/systems/$sysId/delete");
 $st = $adm->state();
 check('Exclui o sistema vazio', $c === 200 && !array_filter($st['systems'], fn($x) => $x['id'] === $sysId), "HTTP $c");
+
+/* ---------------- 9h. Permissões separadas ---------------- */
+echo "\n9h) Cada recurso tem a sua permissão\n";
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['modulos', 'postar', 'sugerir']]);
+[$c] = $alu3->req('POST', '/api/systems', ['name' => 'Sem permissao ' . $uniq]);
+check('"Criar módulos" não dá direito a criar sistemas (403)', $c === 403, "HTTP $c");
+[$c] = $alu3->req('POST', "/api/quizzes/$modId", ['title' => 'x', 'questions' => [['q' => 'Pergunta?', 'options' => ['a', 'b'], 'correct' => 0]]]);
+check('"Criar módulos" não dá direito a criar provas (403)', $c === 403, "HTTP $c");
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['usuarios', 'postar', 'sugerir']]);
+$st = $alu3->state();
+check('"Gerenciar usuários" não mostra os últimos acessos', !isset($st['access']));
+[$c] = $alu3->req('GET', '/api/reports/progress');
+check('"Gerenciar usuários" não mostra o progresso da equipe (403)', $c === 403, "HTTP $c");
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['acessos', 'equipe', 'sistemas', 'provas', 'postar', 'sugerir']]);
+$st = $alu3->state();
+check('Com "Ver últimos acessos", vê os acessos', isset($st['access']));
+[$c] = $alu3->req('GET', '/api/reports/progress');
+check('Com "Ver progresso da equipe", vê o progresso', $c === 200, "HTTP $c");
+[$c, $j] = $alu3->req('POST', '/api/systems', ['name' => 'Com permissao ' . $uniq]);
+check('Com "Criar e editar sistemas", cria sistema', $c === 200, "HTTP $c");
+if (!empty($j['id'])) $adm->req('POST', "/api/systems/{$j['id']}/delete");
+$pdo->prepare("INSERT INTO users (name, username, email, password, role, status, company_name, created_at, updated_at) VALUES (?, ?, ?, ?, 'user', 'aprovado', 'InfotecSoft', NOW(), NOW())")
+    ->execute(['Novo Padrao', "novo$uniq", "novo$uniq@teste.com", password_hash('Senha1234', PASSWORD_DEFAULT)]);
+$novoId = (int) $pdo->lastInsertId();
+$reg = new Client($BASE); $reg->state();
+[$c] = $reg->req('POST', '/api/login', ['username' => "novo$uniq", 'password' => 'Senha1234']);
+$st = $reg->state();
+check('Usuário novo (sem permissões salvas) já pode postar e sugerir, e não é equipe', $c === 200 && ($st['me']['adm'] ?? null) === ['postar', 'sugerir'], "HTTP $c " . json_encode($st['me']['adm'] ?? null));
+$st = $adm->state(); $nu = array_values(array_filter($st['users'] ?? [], fn($u) => $u['id'] === (string) $novoId));
+check('Na lista de usuários, quem nunca teve permissões aparece com postar e sugerir ligados', $nu && $nu[0]['adm'] === ['postar', 'sugerir'], json_encode($nu[0]['adm'] ?? null));
+$pdo->exec("DELETE FROM users WHERE user_id = $novoId");
+$adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['postar', 'sugerir']]);
 
 /* ---------------- 10. Limpeza + logout ---------------- */
 echo "\n10) Limpeza e saída\n";

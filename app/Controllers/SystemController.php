@@ -35,7 +35,7 @@ class SystemController extends Controller
 
     public function store(): void
     {
-        require_login('modulos');
+        require_login('sistemas');
         $d = $this->input();
         if ($this->nameTaken($d['name'])) json_fail('Já existe um sistema com esse nome.', 422, ['errors' => ['sy-name' => 'Já existe um sistema com esse nome.']]);
         $base = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower(iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $d['name']) ?: '')), '-') ?: 'sistema';
@@ -49,7 +49,7 @@ class SystemController extends Controller
 
     public function update(string $id): void
     {
-        require_login('modulos');
+        require_login('sistemas');
         $s = DB::table('systems')->where('system_id', $id)->where('active', 1)->first();
         if (!$s) json_fail('Sistema não encontrado.', 404);
         $d = $this->input();
@@ -60,7 +60,7 @@ class SystemController extends Controller
 
     public function move(string $id): void
     {
-        require_login('modulos');
+        require_login('sistemas');
         $dir = (new Request())->int('dir') < 0 ? -1 : 1;
         $ids = array_column(DB::select('SELECT system_id FROM systems WHERE active = 1 ORDER BY position, system_id'), 'system_id');
         $i = array_search($id, $ids, true);
@@ -75,7 +75,7 @@ class SystemController extends Controller
 
     public function destroy(string $id): void
     {
-        require_login('modulos');
+        require_login('sistemas');
         $s = DB::table('systems')->where('system_id', $id)->where('active', 1)->first();
         if (!$s) json_fail('Sistema não encontrado.', 404);
         $n = (int) (DB::select('SELECT COUNT(*) AS n FROM modules WHERE system_id = ?', [$id])[0]['n'] ?? 0);

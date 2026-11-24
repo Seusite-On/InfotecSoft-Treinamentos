@@ -17,6 +17,7 @@ class SuggestionController extends Controller
     public function store(): void
     {
         $me = require_login();
+        if (!\App\Core\Gate::allows('sugerir')) json_fail('Você não tem permissão para enviar sugestões.', 403);
         $rl = new RateLimiter();
         $key = 'suggest:' . (int) $me['user_id'];
         if ($rl->tooManyAttempts($key, 10, 3600)) json_fail('Você já enviou várias sugestões agora há pouco. Tente de novo mais tarde.', 429);
@@ -33,7 +34,7 @@ class SuggestionController extends Controller
 
     public function status(string $id): void
     {
-        require_login('usuarios');
+        require_login('sugestoes');
         $st = (new Request())->string('status');
         if (!in_array($st, self::STATUSES, true)) json_fail('Status inválido.', 422);
         $note = mb_substr(trim((string) (new Request())->input('note', '')), 0, 500);
@@ -44,7 +45,7 @@ class SuggestionController extends Controller
 
     public function destroy(string $id): void
     {
-        require_login('usuarios');
+        require_login('sugestoes');
         DB::table('suggestions')->where('suggestion_id', (int) $id)->delete();
         json_out(['ok' => true]);
     }

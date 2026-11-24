@@ -43,7 +43,7 @@ class UserService
     {
         if ($u['role'] === 'admin') return ['ok' => false, 'status' => 404, 'message' => 'Usuário não encontrado.'];
         if ((int) $u['user_id'] === (int) Auth::id()) return ['ok' => false, 'status' => 403, 'message' => 'Para a sua própria conta use "Meu perfil".'];
-        if (!Gate::isAdmin() && Gate::codesFor((int) $u['user_id'])) return ['ok' => false, 'status' => 403, 'message' => 'Somente o administrador principal altera contas da equipe.'];
+        if (!Gate::isAdmin() && Gate::staffCodesFor((int) $u['user_id'])) return ['ok' => false, 'status' => 403, 'message' => 'Somente o administrador principal altera contas da equipe.'];
         return null;
     }
 

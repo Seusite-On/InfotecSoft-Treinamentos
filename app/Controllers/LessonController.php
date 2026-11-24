@@ -25,6 +25,7 @@ class LessonController extends Controller
         }
         $in = (new Request())->all();
         $staff = Gate::allows('videos');
+        if (!$staff && !Gate::allows('postar')) json_fail('Você não tem permissão para postar vídeos.', 403);
         if (!$staff) {
             // Postagem da comunidade: qualquer usuário aprovado publica um vídeo NOVO do YouTube nos módulos que ele acessa.
             if (!empty($_SESSION['must_change'])) json_fail('Crie uma nova senha antes de continuar.', 403, ['code' => 'must_change']);

@@ -98,7 +98,7 @@ class ReportController extends Controller
     public function progress(): void
     {
         $me = require_login();
-        if (!Gate::allows('relatorios') && !Gate::allows('usuarios')) json_fail('Você não tem permissão para ver o progresso da equipe.', 403);
+        if (!Gate::allows('equipe')) json_fail('Você não tem permissão para ver o progresso da equipe.', 403);
         $users = DB::select("SELECT user_id, name, username, company_name, last_login_at FROM users WHERE status = 'aprovado' AND role <> 'admin' ORDER BY name LIMIT 2000");
         $views = DB::select('SELECT user_id, lesson_id, started_at, completed_at FROM lesson_views');
         $att = DB::select('SELECT a.user_id, z.module_id, MAX(a.score * 100 / a.total) AS best, MAX(a.passed) AS passed, COUNT(*) AS tentativas

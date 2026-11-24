@@ -36,7 +36,7 @@ class QuizController extends Controller
         $me = require_login();
         $uid = (int) $me['user_id'];
         $q = $this->quiz((int) $id);
-        if (!$q || (!$q['active'] && !Gate::allows('modulos'))) json_fail('Este módulo ainda não tem prova.', 404);
+        if (!$q || (!$q['active'] && !Gate::allows('provas'))) json_fail('Este módulo ainda não tem prova.', 404);
         if (!$this->canSee($uid, (int) $id)) json_fail('Você não tem acesso a este módulo.', 403);
         $qs = array_map(fn($r) => ['id' => (string) $r['question_id'], 'q' => $r['question'], 'options' => json_decode($r['options'], true) ?: []], $this->questions((int) $q['quiz_id']));
         json_out(['ok' => true, 'quiz' => ['module_id' => (int) $id, 'title' => $q['title'], 'pass_pct' => (int) $q['pass_pct'], 'points' => (int) $q['points'], 'active' => (bool) $q['active'], 'questions' => $qs]]);
@@ -87,7 +87,7 @@ class QuizController extends Controller
     /** GET /api/quizzes/{id}/edit — prova completa para edição (com respostas). */
     public function edit(string $id): void
     {
-        require_login('modulos');
+        require_login('provas');
         $m = DB::table('modules')->where('module_id', (int) $id)->first();
         if (!$m) json_fail('Módulo não encontrado.', 404);
         $q = $this->quiz((int) $id);
@@ -100,7 +100,7 @@ class QuizController extends Controller
     /** POST /api/quizzes/{id} — cria ou substitui a prova do módulo. */
     public function save(string $id): void
     {
-        require_login('modulos');
+        require_login('provas');
         $m = DB::table('modules')->where('module_id', (int) $id)->first();
         if (!$m) json_fail('Módulo não encontrado.', 404);
         $b = json_decode((string) file_get_contents('php://input'), true) ?: [];
@@ -138,7 +138,7 @@ class QuizController extends Controller
     /** POST /api/quizzes/{id}/delete */
     public function destroy(string $id): void
     {
-        require_login('modulos');
+        require_login('provas');
         DB::statement('DELETE FROM quizzes WHERE module_id = ?', [(int) $id]);
         json_out(['ok' => true, 'message' => 'Prova excluída.']);
     }

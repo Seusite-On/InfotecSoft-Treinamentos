@@ -6,7 +6,7 @@
 ## O que é
 Portal de videoaulas dos sistemas que a InfotecSoft atende. Sistemas atuais: Fusion Web, Fusion Desktop, E-Trade, Avante, Balanças e Conhecimento fiscal (sistemas novos são criados pelo próprio portal). Os vídeos ficam no **YouTube** e tocam dentro do portal; envio de arquivo de vídeo só para conteúdo que não pode ir ao YouTube (o espaço da hospedagem é limitado).
 
-Funcionalidades: cadastro por CNPJ de empresa cadastrada + aprovação; acesso por sistema/módulo (ou sistema "aberto para todos"); cargos e permissões (aprovacoes, usuarios, modulos, videos, relatorios) e **super usuário**; reset de senha para `12345678` com troca obrigatória (vence em 48 h); sistemas, módulos, vídeos e provas editáveis pelo site; **pontuação** (+10 vídeo assistido até 80% e com metade da duração decorrida, +30 prova aprovada na 1ª vez, +5 vídeo novo postado por qualquer usuário); ranking/relatório com CSV; progresso por usuário ("Continue de onde parou", "Meu progresso", "Progresso da equipe"); notificações de vídeo novo (lidas por vídeo); sugestões; últimos acessos; aviso de versão nova; tema claro/escuro; proteção anti-cópia.
+Funcionalidades: cadastro por CNPJ de empresa cadastrada + aprovação; acesso por sistema/módulo (ou sistema "aberto para todos"); permissões separadas por recurso (ver abaixo) e **super usuário**; reset de senha para `12345678` com troca obrigatória (vence em 48 h); sistemas, módulos, vídeos e provas editáveis pelo site; **pontuação** (+10 vídeo assistido até 80% e com metade da duração decorrida, +30 prova aprovada na 1ª vez, +5 vídeo novo postado por qualquer usuário); ranking/relatório com CSV; progresso por usuário ("Continue de onde parou", "Meu progresso", "Progresso da equipe"); notificações de vídeo novo (lidas por vídeo); sugestões; últimos acessos; aviso de versão nova; tema claro/escuro; proteção anti-cópia.
 
 ## Estrutura
 ```
@@ -39,6 +39,15 @@ publicar-hostinger.bat/.ps1  publica tudo (ver abaixo)
 | Trocar senha do admin no servidor | `definir-senha-admin.bat` (a pessoa digita a senha; nunca automatizar) |
 | Rodar local | Laragon com MySQL ligado → `atualizar-banco.bat` → `iniciar-servidor.bat` → http://localhost:8001 |
 | Testes de API | `php tests/api_test.php http://127.0.0.1:PORTA` (banco de teste; admin local com senha `123`, limpe `storage/security/rate_limits.json` antes) |
+
+## Permissões (regra: TODO recurso novo ganha a sua permissão)
+Códigos em `Gate::MAP` (coluna em `user_permissions`) e na lista `ADM_PERMS`/`USR_PERMS` do `frontend/src/app.js`:
+- Pessoas: `aprovacoes`, `usuarios`, `acessos` (últimos acessos)
+- Conteúdo: `sistemas`, `modulos`, `videos`, `provas`
+- Acompanhamento: `relatorios`, `equipe` (progresso da equipe), `sugestoes` (gerenciar)
+- Recursos de usuário comum (`Gate::USER_FEATURES`, ligados por padrão, não tornam a pessoa "equipe"): `postar`, `sugerir`
+Ao criar um recurso: nova coluna na migração (com a cópia de quem já tinha o acesso), entrada no `Gate::MAP`, `require_login('codigo')` no controller, entrada em `ADM_PERMS` (com o grupo) ou `USR_PERMS`, `can('codigo')` no menu/tela/rota, e teste em `tests/api_test.php`.
+Só o administrador principal altera permissões; super usuário tem todas.
 
 ## Regras importantes (aprendidas)
 - **Migrações**: arquivos `.sql` separados por `;` — **nunca** use `;` dentro de comentários ou textos. Use `INSERT IGNORE`/`NOT EXISTS` para serem seguras de rodar de novo. Para achar módulos use `system_id` + `name` (os IDs mudam entre local e produção).

@@ -100,7 +100,9 @@ class StateService
                 $id = (int) $u['user_id'];
                 $adm = [];
                 foreach (Gate::MAP as $code => $col) {
-                    if ((int) ($permsAll[$id][$col] ?? 0) === 1) {
+                    // sem registro salvo: recursos de usuário comum vêm ligados (mesma regra do Gate)
+                    $def = in_array($code, Gate::USER_FEATURES, true) ? 1 : 0;
+                    if ((int) ($permsAll[$id][$col] ?? $def) === 1) {
                         $adm[] = $code;
                     }
                 }
@@ -130,17 +132,17 @@ class StateService
             \App\Core\DB::select('SELECT z.module_id, MAX(a.score * 100 / a.total) AS best, MAX(a.passed) AS passed, COUNT(*) AS tentativas FROM quiz_attempts a JOIN quizzes z ON z.quiz_id = a.quiz_id WHERE a.user_id = ? GROUP BY z.module_id', [$uid]));
         // Provas existentes (por módulo)
         $state['quizzes'] = array_map(fn($z) => ['module_id' => (int) $z['module_id'], 'title' => $z['title'], 'n' => (int) $z['n'], 'pass_pct' => (int) $z['pass_pct'], 'points' => (int) $z['points'], 'active' => (bool) $z['active']],
-            \App\Core\DB::select('SELECT z.*, (SELECT COUNT(*) FROM quiz_questions q WHERE q.quiz_id = z.quiz_id) AS n FROM quizzes z' . ($isAdmin || \App\Core\Gate::allows('modulos') ? '' : ' WHERE z.active = 1')));
+            \App\Core\DB::select('SELECT z.*, (SELECT COUNT(*) FROM quiz_questions q WHERE q.quiz_id = z.quiz_id) AS n FROM quizzes z' . ($isAdmin || \App\Core\Gate::allows('provas') ? '' : ' WHERE z.active = 1')));
 
-        // Últimos acessos (equipe com permissão de usuários)
-        if (Gate::allows('usuarios')) {
+        // Últimos acessos (permissão própria)
+        if (Gate::allows('acessos')) {
             $state['access'] = array_map(fn($r) => [
                 'id' => (string) $r['log_id'], 'ev' => $r['event'], 'nome' => $r['name'] ?? '', 'usuario' => $r['username'] ?? '', 'empresa' => $r['company_name'] ?? '',
                 'ip' => $r['ip'] ?? '', 'ua' => $r['user_agent'] ?? '', 'em' => ms($r['created_at']), 'uid' => $r['user_id'] ? (string) $r['user_id'] : '',
             ], \App\Core\DB::select('SELECT a.*, u.name, u.company_name FROM access_logs a LEFT JOIN users u ON u.user_id = a.user_id ORDER BY a.log_id DESC LIMIT 300'));
         }
         // Sugestões: a equipe vê todas, cada usuário vê as próprias
-        $isTeam = Gate::allows('usuarios');
+        $isTeam = Gate::allows('sugestoes');
         $rows = $isTeam
             ? \App\Core\DB::select('SELECT s.*, u.name, u.company_name FROM suggestions s JOIN users u ON u.user_id = s.user_id ORDER BY s.created_at DESC LIMIT 300')
             : \App\Core\DB::select('SELECT s.*, NULL AS name, NULL AS company_name FROM suggestions s WHERE s.user_id = ? ORDER BY s.created_at DESC LIMIT 50', [$uid]);

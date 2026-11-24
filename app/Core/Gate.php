@@ -17,7 +17,29 @@ class Gate
         'modulos'    => 'can_manage_modules',
         'videos'     => 'can_manage_videos',
         'relatorios' => 'can_view_reports',
+        'equipe'     => 'can_view_team',
+        'sistemas'   => 'can_manage_systems',
+        'provas'     => 'can_manage_quizzes',
+        'acessos'    => 'can_view_access_log',
+        'sugestoes'  => 'can_manage_suggestions',
+        'postar'     => 'can_post_videos',
+        'sugerir'    => 'can_send_suggestions',
     ];
+
+    /** Recursos de usuário comum: vêm ligados por padrão e não fazem a pessoa ser "equipe". */
+    public const USER_FEATURES = ['postar', 'sugerir'];
+
+    private static function on(array $row, string $code, string $col): bool
+    {
+        if (!$row) return in_array($code, self::USER_FEATURES, true);
+        return (int) ($row[$col] ?? (in_array($code, self::USER_FEATURES, true) ? 1 : 0)) === 1;
+    }
+
+    /** Códigos administrativos do usuário (sem os recursos de usuário comum). */
+    public static function staffCodesFor(int $userId): array
+    {
+        return array_values(array_diff(self::codesFor($userId), self::USER_FEATURES));
+    }
 
     public static function isAdmin(): bool
     {
@@ -40,7 +62,7 @@ class Gate
         if ((int) ($row['is_super'] ?? 0) === 1) {
             return true;
         }
-        return isset($row[$col]) && (int) $row[$col] === 1;
+        return self::on($row, $permission, $col);
     }
 
     /** Lista de códigos liberados para um usuário (ex.: ['modulos','videos']) */
@@ -52,7 +74,7 @@ class Gate
         }
         $out = [];
         foreach (self::MAP as $code => $col) {
-            if ((int) ($row[$col] ?? 0) === 1) {
+            if (self::on($row, $code, $col)) {
                 $out[] = $code;
             }
         }
@@ -61,7 +83,7 @@ class Gate
 
     public static function isStaff(): bool
     {
-        foreach (array_keys(self::MAP) as $p) {
+        foreach (array_diff(array_keys(self::MAP), self::USER_FEATURES) as $p) {
             if (self::allows($p)) {
                 return true;
             }
