@@ -19,7 +19,19 @@ class ReportController extends Controller
         $wv = 'v.completed_at IS NOT NULL'; $av = [];
         $wq = 'a.points > 0'; $aq = [];
         $wp = 'l.post_points > 0'; $ap = [];
-        if ($days > 0) { $wv .= ' AND v.completed_at >= (NOW() - INTERVAL ? DAY)'; $av[] = $days; $wq .= ' AND a.created_at >= (NOW() - INTERVAL ? DAY)'; $aq[] = $days; $wp .= ' AND l.created_at >= (NOW() - INTERVAL ? DAY)'; $ap[] = $days; }
+        // período: datas escolhidas (de/até, inclusive) ou "últimos N dias"
+        $de = $q->string('de'); $ate = $q->string('ate');
+        $de = preg_match('/^\d{4}-\d{2}-\d{2}$/', $de) ? $de . ' 00:00:00' : '';
+        $ate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $ate) ? $ate . ' 23:59:59' : '';
+        if ($de !== '' && $ate !== '' && $de > $ate) json_fail('A data inicial é depois da data final.', 422);
+        if ($de === '' && $ate === '' && $days > 0) $de = date('Y-m-d H:i:s', time() - $days * 86400);
+        foreach ([['v.completed_at', 'wv', 'av'], ['a.created_at', 'wq', 'aq'], ['l.created_at', 'wp', 'ap']] as [$col, $w, $a]) {
+            if ($de !== '') { $$w .= " AND $col >= ?"; $$a[] = $de; }
+            if ($ate !== '') { $$w .= " AND $col <= ?"; $$a[] = $ate; }
+        }
+        // por usuário
+        $uid = $q->int('usuario');
+        if ($uid > 0) { $wv .= ' AND v.user_id = ?'; $av[] = $uid; $wq .= ' AND a.user_id = ?'; $aq[] = $uid; $wp .= ' AND l.created_by = ?'; $ap[] = $uid; }
         if ($sys !== '') { $wv .= ' AND m.system_id = ?'; $av[] = $sys; $wq .= ' AND m.system_id = ?'; $aq[] = $sys; $wp .= ' AND m.system_id = ?'; $ap[] = $sys; }
         $views = DB::select("SELECT v.user_id, COUNT(*) AS videos, SUM(v.points) AS pontos, MAX(v.completed_at) AS ultimo, COUNT(DISTINCT l.module_id) AS modulos
               FROM lesson_views v JOIN lessons l ON l.lesson_id = v.lesson_id JOIN modules m ON m.module_id = l.module_id
@@ -56,7 +68,22 @@ class ReportController extends Controller
         $top = DB::select(
             "SELECT l.title, m.system_id, COUNT(*) AS vezes FROM lesson_views v JOIN lessons l ON l.lesson_id = v.lesson_id JOIN modules m ON m.module_id = l.module_id
               WHERE $wv GROUP BY l.lesson_id, l.title, m.system_id ORDER BY vezes DESC LIMIT 10", $av);
-        json_out(['ok' => true, 'rows' => array_slice($rows, 0, 500),
+        // extrato do usuário escolhido: cada vídeo, prova e postagem com data e pontos
+        $detalhe = [];
+        if ($uid > 0) {
+            foreach (DB::select("SELECT 'video' AS tipo, l.title AS titulo, m.system_id AS sistema, m.name AS modulo, v.points AS pontos, v.completed_at AS em
+                  FROM lesson_views v JOIN lessons l ON l.lesson_id = v.lesson_id JOIN modules m ON m.module_id = l.module_id WHERE $wv", $av) as $r) $detalhe[] = $r;
+            foreach (DB::select("SELECT 'prova' AS tipo, z.title AS titulo, m.system_id AS sistema, m.name AS modulo, a.points AS pontos, a.created_at AS em, a.score, a.total, a.passed
+                  FROM quiz_attempts a JOIN quizzes z ON z.quiz_id = a.quiz_id JOIN modules m ON m.module_id = z.module_id WHERE " . str_replace('a.points > 0', '1=1', $wq), $aq) as $r) $detalhe[] = $r;
+            foreach (DB::select("SELECT 'postagem' AS tipo, l.title AS titulo, m.system_id AS sistema, m.name AS modulo, l.post_points AS pontos, l.created_at AS em
+                  FROM lessons l JOIN modules m ON m.module_id = l.module_id WHERE $wp AND l.created_by IS NOT NULL", $ap) as $r) $detalhe[] = $r;
+            usort($detalhe, fn($a, $b) => strcmp((string) $b['em'], (string) $a['em']));
+            $detalhe = array_map(fn($r) => ['tipo' => $r['tipo'], 'titulo' => $r['titulo'], 'sistema' => $r['sistema'], 'modulo' => $r['modulo'], 'pontos' => (int) $r['pontos'], 'em' => ms($r['em']),
+                'nota' => isset($r['total']) && $r['total'] ? (int) round($r['score'] * 100 / $r['total']) : null, 'aprovado' => isset($r['passed']) ? (bool) $r['passed'] : null], array_slice($detalhe, 0, 1000));
+        }
+        $usuarios = array_map(fn($u) => ['id' => (string) $u['user_id'], 'nome' => $u['name'], 'empresa' => $u['company_name'] ?? ''],
+            DB::select("SELECT user_id, name, company_name FROM users WHERE status = 'aprovado' ORDER BY name LIMIT 3000"));
+        json_out(['ok' => true, 'rows' => array_slice($rows, 0, 500), 'detalhe' => $detalhe, 'usuarios' => $usuarios,
             'top' => array_map(fn($r) => ['titulo' => $r['title'], 'sistema' => $r['system_id'], 'vezes' => (int) $r['vezes']], $top)]);
     }
 

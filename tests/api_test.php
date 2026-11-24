@@ -376,6 +376,14 @@ check('Aluno sem permissão não vê o relatório (403)', $c === 403, "HTTP $c")
 $me = array_values(array_filter($j['rows'] ?? [], fn($r) => $r['id'] === (string) $aluId));
 check('Admin vê o aluno no ranking com 10 pontos e 1 vídeo', $c === 200 && $me && $me[0]['pontos'] === 10 && $me[0]['videos'] === 1, "HTTP $c");
 check('Relatório traz os vídeos mais assistidos', !empty($j['top']), "HTTP $c");
+$hoje = date('Y-m-d');
+[$c, $j] = $adm->req('GET', "/api/reports/ranking?de=$hoje&ate=$hoje&usuario=$aluId");
+check('Relatório por período (datas) e por usuário traz só ele', $c === 200 && count($j['rows'] ?? []) === 1 && ($j['rows'][0]['id'] ?? '') === (string) $aluId, "HTTP $c");
+check('Extrato do usuário lista o vídeo assistido com pontos', $c === 200 && ($j['detalhe'][0]['tipo'] ?? '') === 'video' && ($j['detalhe'][0]['pontos'] ?? 0) === 10);
+[$c, $j] = $adm->req('GET', "/api/reports/ranking?de=2020-01-01&ate=2020-01-31&usuario=$aluId");
+check('Período sem atividade volta vazio', $c === 200 && ($j['rows'] ?? null) === [] && ($j['detalhe'] ?? null) === []);
+[$c] = $adm->req('GET', "/api/reports/ranking?de=2026-12-31&ate=2026-01-01");
+check('Data inicial depois da final é recusada', $c === 422, "HTTP $c");
 [$c, $j] = $adm->req('GET', '/api/reports/ranking?sistema=sistema-inexistente');
 check('Filtro por sistema funciona', $c === 200 && ($j['rows'] ?? null) === [], "HTTP $c");
 [$c] = $adm->req('POST', "/api/users/$aluId/access", ['modules' => [$modId], 'adm' => ['relatorios']]);
@@ -545,13 +553,20 @@ check('Após logout, sessão encerrada', ($st['me'] ?? null) === null);
 [$c] = $adm->req('POST', '/api/modules', ['system' => 'fusion-web', 'name' => 'Depois ' . $uniq]);
 check('Após logout, ações exigem login (401)', $c === 401, "HTTP $c");
 
-/* cadastro: limite por rede (5 por hora) */
+/* cadastro: várias pessoas da mesma rede passam; abuso (100+/hora) é bloqueado */
 echo "\n11) Limite de cadastros por rede\n";
-$sp = new Client($BASE); $sp->state(); $last = 0;
-for ($i = 0; $i < 6; $i++) {
+$sp = new Client($BASE); $sp->state(); $ok = 0;
+for ($i = 0; $i < 8; $i++) {
     [$last] = $sp->req('POST', '/api/register', array_merge($base, ['email' => "spam$i$uniq@teste.com", 'user' => "spam$i$uniq", 'pw' => 'Senha' . $uniq . '1']));
+    if ($last === 201) $ok++;
 }
-check('Cadastros em massa da mesma rede bloqueados (429)', $last === 429, "HTTP $last");
+check('8 cadastros seguidos da mesma rede (escritório) são aceitos', $ok === 8, "$ok de 8");
+$rlf = __DIR__ . '/../storage/security/rate_limits.json';
+$rl = is_file($rlf) ? (json_decode((string) file_get_contents($rlf), true) ?: []) : [];
+$rl['register:' . hash('sha256', '127.0.0.1')] = ['attempts' => 100, 'expires_at' => time() + 3600];
+file_put_contents($rlf, json_encode($rl));
+[$last] = $sp->req('POST', '/api/register', array_merge($base, ['email' => "spamx$uniq@teste.com", 'user' => "spamx$uniq", 'pw' => 'Senha' . $uniq . '1']));
+check('Cadastros em massa da mesma rede (100+/hora) bloqueados (429)', $last === 429, "HTTP $last");
 
 echo "\nResultado: $pass OK, $fail falha(s)\n";
 if ($fails) { echo "Falhas:\n - " . implode("\n - ", $fails) . "\n"; }
