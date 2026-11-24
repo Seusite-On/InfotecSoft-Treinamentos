@@ -70,9 +70,16 @@ class QuizController extends Controller
         }
         $total = count($qs);
         $passed = $score * 100 >= (int) $q['pass_pct'] * $total;
-        $already = DB::select('SELECT 1 FROM quiz_attempts WHERE quiz_id = ? AND user_id = ? AND passed = 1 LIMIT 1', [$q['quiz_id'], $uid]) !== [];
-        $points = $passed && !$already ? (int) $q['points'] : 0;
-        DB::table('quiz_attempts')->insert(['quiz_id' => $q['quiz_id'], 'user_id' => $uid, 'score' => $score, 'total' => $total, 'passed' => $passed ? 1 : 0, 'points' => $points, 'created_at' => now()]);
+        // trava por usuário+prova: dois envios ao mesmo tempo não ganham os pontos duas vezes
+        $lock = 'quiz_' . $uid . '_' . $q['quiz_id'];
+        DB::select('SELECT GET_LOCK(?, 5) AS l', [$lock]);
+        try {
+            $already = DB::select('SELECT 1 FROM quiz_attempts WHERE quiz_id = ? AND user_id = ? AND passed = 1 LIMIT 1', [$q['quiz_id'], $uid]) !== [];
+            $points = $passed && !$already ? (int) $q['points'] : 0;
+            DB::table('quiz_attempts')->insert(['quiz_id' => $q['quiz_id'], 'user_id' => $uid, 'score' => $score, 'total' => $total, 'passed' => $passed ? 1 : 0, 'points' => $points, 'created_at' => now()]);
+        } finally {
+            DB::select('SELECT RELEASE_LOCK(?) AS l', [$lock]);
+        }
         json_out(['ok' => true, 'score' => $score, 'total' => $total, 'passed' => $passed, 'points' => $points, 'already' => $already,
             'pontos_total' => ProgressController::total($uid), 'results' => $res]);
     }

@@ -32,7 +32,8 @@ class ProgressController extends Controller
 
         if ($ev === 'start') {
             if (!$row) {
-                DB::table('lesson_views')->insert(['user_id' => $uid, 'lesson_id' => (int) $id, 'started_at' => now(), 'points' => 0]);
+                // INSERT IGNORE: duas abas abrindo a mesma aula ao mesmo tempo não dão erro
+                DB::statement('INSERT IGNORE INTO lesson_views (user_id, lesson_id, started_at, points) VALUES (?, ?, ?, 0)', [$uid, (int) $id, now()]);
             }
             // reabrir a aula não zera o início: o tempo assistido antes continua valendo
             json_out(['ok' => true, 'done' => (bool) ($row['completed_at'] ?? false)]);
@@ -46,7 +47,9 @@ class ProgressController extends Controller
             $min = $sec > 0 ? min((int) floor($sec * 0.5), 1200) : 30;
             $elapsed = time() - strtotime((string) $row['started_at']);
             if ($elapsed < $min) json_fail('Continue assistindo para ganhar os pontos.', 422, ['code' => 'too_fast', 'wait' => $min - $elapsed]);
-            DB::table('lesson_views')->where('user_id', $uid)->where('lesson_id', (int) $id)->update(['completed_at' => now(), 'points' => self::POINTS_PER_VIDEO]);
+            // só a primeira conclusão marca os pontos (atômico: duas requisições juntas não somam em dobro)
+            $n = DB::affecting('UPDATE lesson_views SET completed_at = ?, points = ? WHERE user_id = ? AND lesson_id = ? AND completed_at IS NULL', [now(), self::POINTS_PER_VIDEO, $uid, (int) $id]);
+            if (!$n) json_out(['ok' => true, 'already' => true, 'points' => 0, 'total' => self::total($uid)]);
             json_out(['ok' => true, 'points' => self::POINTS_PER_VIDEO, 'total' => self::total($uid)]);
         }
         json_fail('Evento inválido.', 422);

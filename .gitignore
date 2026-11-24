@@ -11,3 +11,5 @@
 *.pem
 # dados do servidor (ficam so no PC)
 /deploy/servidor.local.json
+# fonte das telas (sem ofuscar): fica so no PC
+/frontend/

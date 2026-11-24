@@ -30,7 +30,8 @@ class AuthController extends Controller
         $ipKey = 'login-ip:' . hash('sha256', $this->request->clientIp());
         $userKey = 'login-user:' . hash('sha256', strtolower($username ?: 'guest')); // mesmo usuário vindo de vários IPs
 
-        foreach ([[$rateKey, 5], [$ipKey, 20], [$userKey, 10]] as [$k, $max]) {
+        // a mesma rede (escritório, Wi-Fi) é usada por várias pessoas: o limite por IP é folgado
+        foreach ([[$rateKey, 5], [$ipKey, 60], [$userKey, 10]] as [$k, $max]) {
             if ($this->rateLimiter->tooManyAttempts($k, $max, 900)) {
                 \App\Services\AccessLog::record('bloqueado', null, $username);
                 header('Retry-After: ' . $this->rateLimiter->availableIn($k));
@@ -69,11 +70,11 @@ class AuthController extends Controller
     {
         $key = 'register:' . hash('sha256', $this->request->clientIp());
         $tryKey = 'register-try:' . hash('sha256', $this->request->clientIp());
-        if ($this->rateLimiter->tooManyAttempts($tryKey, 20, 3600)) {
+        if ($this->rateLimiter->tooManyAttempts($tryKey, 300, 3600)) {
             json_fail('Muitas tentativas de cadastro. Tente novamente mais tarde.', 429, ['code' => 'locked']);
         }
         $this->rateLimiter->hit($tryKey, 3600);
-        if ($this->rateLimiter->tooManyAttempts($key, 5, 3600)) {
+        if ($this->rateLimiter->tooManyAttempts($key, 100, 3600)) {
             json_fail('Muitos cadastros feitos a partir desta rede. Tente novamente mais tarde.', 429, ['code' => 'locked']);
         }
         $in = $this->request->all();

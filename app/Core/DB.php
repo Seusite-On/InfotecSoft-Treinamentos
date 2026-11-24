@@ -33,5 +33,13 @@ class DB
         $stmt = self::connection()->prepare($sql);
         return $stmt->execute($bindings);
     }
+
+    /** Executa e devolve quantas linhas foram alteradas. */
+    public static function affecting(string $sql, array $bindings = []): int
+    {
+        $stmt = self::connection()->prepare($sql);
+        $stmt->execute($bindings);
+        return $stmt->rowCount();
+    }
 }
 
